@@ -1,0 +1,80 @@
+import type { SystemEntity, Project } from "./types";
+
+export const systems: SystemEntity[] = [
+  {
+    id: "sys-payment",
+    name: "Payment Service",
+    description: "Charges, refunds, and settlement for customer payments.",
+    ownerTeamId: "team-engineering",
+  },
+  {
+    id: "sys-api",
+    name: "API Gateway",
+    description: "Public entry point for Acme services.",
+    ownerTeamId: "team-ops",
+    previousOwnerTeamId: "team-engineering",
+  },
+  {
+    id: "sys-db",
+    name: "Database",
+    description: "Primary production datastore for customer and payment records.",
+    ownerTeamId: "team-engineering",
+  },
+  {
+    id: "sys-cicd",
+    name: "CI/CD",
+    description: "Build, test, and release pipeline used by production deployments.",
+    ownerTeamId: "team-engineering",
+  },
+];
+
+export const projects: Project[] = [
+  {
+    id: "proj-payments",
+    name: "Payments Reliability",
+    description: "Hardens payment deployment and recovery paths.",
+    ownerTeamId: "team-engineering",
+    ownerPersonId: "person-alex",
+    status: "active",
+    lastUpdated: "2026-09-13T10:15:00",
+    decisionIds: ["dec-184", "dec-172"],
+    processIds: ["proc-deploy", "proc-sec-review"],
+    signalCount: 8,
+  },
+  {
+    id: "proj-atlas",
+    name: "Project Atlas",
+    description: "Enterprise pricing restructure — moving from monthly to annual contracts for predictable revenue.",
+    ownerTeamId: "team-product",
+    ownerPersonId: "person-sarah",
+    status: "active",
+    lastUpdated: "2026-09-14T09:30:00",
+    decisionIds: ["dec-142", "dec-138"],
+    processIds: ["proc-onboard"],
+    signalCount: 12,
+  },
+  {
+    id: "proj-security",
+    name: "Security Hardening",
+    description: "Systematic improvement of security posture across deployment and access control.",
+    ownerTeamId: "team-security",
+    ownerPersonId: "person-maya",
+    status: "active",
+    lastUpdated: "2026-09-12T14:43:00",
+    decisionIds: ["dec-184", "dec-172"],
+    processIds: ["proc-sec-review", "proc-deploy"],
+    signalCount: 5,
+  },
+  {
+    id: "proj-portal",
+    name: "Customer Portal Redesign",
+    description: "Redesign of the customer-facing portal for self-service account management.",
+    ownerTeamId: "team-product",
+    ownerPersonId: "person-lena",
+    status: "planning",
+    lastUpdated: "2026-09-10T11:00:00",
+    decisionIds: ["dec-135"],
+    processIds: [],
+    signalCount: 3,
+  },
+];

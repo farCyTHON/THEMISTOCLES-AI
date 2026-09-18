@@ -1,0 +1,104 @@
+@import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap");
+
+:root {
+  --bg: #f7f8fa;
+  --surface: #ffffff;
+  --surface-2: #f0f2f6;
+  --border: #e7eaf0;
+  --border-strong: #d5dbe6;
+  --text: #172033;
+  --text-secondary: #667085;
+  --text-muted: #98a2b3;
+  --accent: #3867d6;
+  --accent-soft: #eef3fb;
+  --success: #2e9b67;
+  --success-soft: #e8f6ef;
+  --warning: #d98c2b;
+  --warning-soft: #fef5ea;
+  --danger: #d45757;
+  --danger-soft: #fdf2f2;
+  --decision: #7567d8;
+  --decision-soft: #f1effb;
+  --shadow: 0 1px 2px rgba(23, 32, 51, 0.04), 0 8px 24px rgba(23, 32, 51, 0.04);
+  --shadow-lg: 0 4px 12px rgba(23, 32, 51, 0.08), 0 16px 36px rgba(23, 32, 51, 0.08);
+  --radius: 10px;
+  --radius-sm: 8px;
+  --sidebar: 248px;
+  --header: 56px;
+  --font: "IBM Plex Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --focus: 0 0 0 3px rgba(56, 103, 214, 0.28);
+}
+
+:root[data-theme="dark"],
+[data-theme="dark"] {
+  --bg: #0c1016;
+  --surface: #121820;
+  --surface-2: #18212b;
+  --border: #27313d;
+  --border-strong: #384656;
+  --text: #f3f6fa;
+  --text-secondary: #9aa7b5;
+  --text-muted: #6f7c8b;
+  --accent: #6e8bff;
+  --accent-soft: rgba(110, 139, 255, 0.14);
+  --success: #48b982;
+  --success-soft: rgba(72, 185, 130, 0.14);
+  --warning: #dca35b;
+  --warning-soft: rgba(220, 163, 91, 0.14);
+  --danger: #e16d70;
+  --danger-soft: rgba(225, 109, 112, 0.14);
+  --decision: #8b7cf6;
+  --decision-soft: rgba(139, 124, 246, 0.14);
+  --shadow: 0 2px 8px rgba(0, 0, 0, 0.4), 0 12px 32px rgba(0, 0, 0, 0.5);
+  --shadow-lg: 0 6px 20px rgba(0, 0, 0, 0.55), 0 20px 48px rgba(0, 0, 0, 0.65);
+  --focus: 0 0 0 3px rgba(110, 139, 255, 0.35);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font);
+  color: var(--text);
+  background: var(--bg);
+  line-height: 1.45;
+}
+
+button,
+input,
+textarea {
+  font-family: inherit;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button {
+  cursor: pointer;
+}
+
+:focus-visible {
+  outline: none;
+  box-shadow: var(--focus);
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  border: 0;
+}

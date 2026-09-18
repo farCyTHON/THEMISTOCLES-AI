@@ -1,0 +1,186 @@
+import type { GraphEdge, GraphNode, SearchHit } from "./types";
+
+export const graphNodes: GraphNode[] = [
+  {
+    id: "node-eng",
+    kind: "team",
+    entityId: "team-engineering",
+    label: "Engineering",
+    subtitle: "Team",
+    x: 280,
+    y: 36,
+  },
+  {
+    id: "node-deploy",
+    kind: "process",
+    entityId: "proc-deploy",
+    label: "Deployment Process",
+    subtitle: "Process · v3.2",
+    x: 248,
+    y: 156,
+  },
+  {
+    id: "node-pay",
+    kind: "system",
+    entityId: "sys-payment",
+    label: "Payment Service",
+    subtitle: "System",
+    x: 20,
+    y: 276,
+  },
+  {
+    id: "node-sec-review",
+    kind: "process",
+    entityId: "proc-sec-review",
+    label: "Security Review",
+    subtitle: "Process",
+    x: 248,
+    y: 276,
+  },
+  {
+    id: "node-d184",
+    kind: "decision",
+    entityId: "dec-184",
+    label: "Decision #184",
+    subtitle: "Decision",
+    x: 490,
+    y: 276,
+  },
+  {
+    id: "node-cicd",
+    kind: "system",
+    entityId: "sys-cicd",
+    label: "CI/CD",
+    subtitle: "System",
+    x: 20,
+    y: 36,
+  },
+  {
+    id: "node-migrate",
+    kind: "process",
+    entityId: "proc-migrate",
+    label: "Database Migration",
+    subtitle: "Process · v2.3",
+    x: 520,
+    y: 36,
+  },
+  {
+    id: "node-db",
+    kind: "system",
+    entityId: "sys-db",
+    label: "Database",
+    subtitle: "System",
+    x: 740,
+    y: 36,
+  },
+];
+
+export const graphEdges: GraphEdge[] = [
+  { id: "e-eng-deploy", from: "node-eng", to: "node-deploy", label: "owns" },
+  { id: "e-deploy-pay", from: "node-deploy", to: "node-pay", label: "affects" },
+  { id: "e-deploy-sec", from: "node-deploy", to: "node-sec-review", label: "requires" },
+  { id: "e-sec-d184", from: "node-sec-review", to: "node-d184", label: "changed by" },
+  { id: "e-cicd-deploy", from: "node-cicd", to: "node-deploy", label: "used by" },
+  { id: "e-eng-migrate", from: "node-eng", to: "node-migrate", label: "runs" },
+  { id: "e-migrate-db", from: "node-migrate", to: "node-db", label: "modifies" },
+];
+
+export const searchHits: SearchHit[] = [
+  {
+    id: "q-deploy",
+    query: "Why did we change the deployment process?",
+    keywords: ["deploy", "deployment process", "security review", "v3.2", "why did we change"],
+    answer:
+      "The deployment process was updated to require a security review before production deployment.",
+    answerDetail:
+      "The decision was introduced on September 12, 2026 and became part of the current workflow in v3.2.",
+    entityKind: "process",
+    entityId: "proc-deploy",
+    evidenceIds: ["ev-slack-184", "ev-meeting-184"],
+    relatedDecisionId: "dec-184",
+    relatedProcessId: "proc-deploy",
+    related: [
+      { targetKind: "process", targetId: "proc-deploy", label: "process" },
+      { targetKind: "decision", targetId: "dec-184", label: "decision" },
+      { targetKind: "process", targetId: "proc-sec-review", label: "requires" },
+    ],
+  },
+  {
+    id: "q-payment-owner",
+    query: "Who owns the payment service?",
+    keywords: ["who owns", "payment service", "payment", "owner"],
+    answer: "Payment Service is owned by Engineering.",
+    answerDetail:
+      "Alex Chen is the Engineering contact. Production releases go through the Deployment Process, which now includes a Security review.",
+    entityKind: "system",
+    entityId: "sys-payment",
+    evidenceIds: ["ev-pay-policy"],
+    relatedProcessId: "proc-deploy",
+    related: [
+      { targetKind: "system", targetId: "sys-payment", label: "system" },
+      { targetKind: "team", targetId: "team-engineering", label: "owner" },
+      { targetKind: "process", targetId: "proc-deploy", label: "deployed via" },
+    ],
+  },
+  {
+    id: "q-week",
+    query: "What changed in Engineering this week?",
+    keywords: ["what changed", "engineering this week", "this week", "recent"],
+    answer:
+      "Engineering’s production memory changed when the Deployment Process started requiring a Security review.",
+    answerDetail: "API Gateway ownership also moved from platform work in Engineering to Operations.",
+    entityKind: "process",
+    entityId: "proc-deploy",
+    evidenceIds: ["ev-slack-184", "ev-api-own"],
+    relatedDecisionId: "dec-184",
+    relatedProcessId: "proc-deploy",
+    related: [
+      { targetKind: "process", targetId: "proc-deploy", label: "changed" },
+      { targetKind: "system", targetId: "sys-api", label: "ownership" },
+    ],
+  },
+  {
+    id: "q-migrate",
+    query: "Why do database migrations happen on Tuesday now?",
+    keywords: [
+      "tuesday",
+      "tuesday now",
+      "database migration",
+      "migrations",
+      "friday evening",
+      "why do database",
+    ],
+    answer: "Database migrations now happen Tuesday mornings.",
+    answerDetail:
+      "The schedule changed from Friday evening after the Engineering team updated the migration workflow. This was recorded as a new workflow version. Sam Lee maintains the migration checklist.",
+    entityKind: "process",
+    entityId: "proc-migrate",
+    evidenceIds: ["ev-migrate-alex", "ev-migrate-sam"],
+    relatedProcessId: "proc-migrate",
+    relatedDecisionId: "dec-184",
+    requiresMutation: true,
+    related: [
+      { targetKind: "process", targetId: "proc-migrate", label: "process" },
+      { targetKind: "decision", targetId: "dec-184", label: "related" },
+      { targetKind: "person", targetId: "person-sam", label: "maintains" },
+    ],
+  },
+  {
+    id: "q-security-decisions",
+    query: "Show recent security decisions.",
+    keywords: ["security decision", "recent security", "show recent", "architecture decision"],
+    answer:
+      "The most recent security-related decision is #184: mandatory security review before production deployment.",
+    answerDetail:
+      "Decision #172 still requires two-person review for Payment Service deploys. Decision #179 moved API Gateway ownership to Operations.",
+    entityKind: "decision",
+    entityId: "dec-184",
+    evidenceIds: ["ev-slack-184"],
+    relatedDecisionId: "dec-184",
+    related: [
+      { targetKind: "decision", targetId: "dec-184", label: "decision" },
+      { targetKind: "decision", targetId: "dec-172", label: "related" },
+      { targetKind: "process", targetId: "proc-sec-review", label: "requires" },
+    ],
+  },
+];
