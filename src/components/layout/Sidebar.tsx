@@ -18,7 +18,7 @@ export function Sidebar({
     <aside className={`sidebar ${open ? "open" : ""}`}>
       <div className="brand">
         <div className="brand-mark" aria-hidden>
-          T
+          <img src="assets/brand-logo.png" alt="Brand Logo" width={30} height={30} />
         </div>
         <div>
           <h1>THEMISTOCLES</h1>
