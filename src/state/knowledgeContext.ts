@@ -1,5 +1,5 @@
 import { createContext, useContext, type Dispatch } from "react";
-import type { KnowledgeSnapshot, MutationResult } from "../data/types";
+import type { KnowledgeSnapshot, MutationResult, LivingArtifact, ActionStatus } from "../data/types";
 
 export type ProcessingStatus = "idle" | "processing" | "complete";
 
@@ -31,13 +31,16 @@ export type KnowledgeAction =
   | {
       type: "update-action-status";
       id: string;
-      status: "proposed" | "under-review" | "approved" | "executed";
+      status: ActionStatus;
       executedBy?: string;
       result?: string;
+      dismissedBy?: string;
+      dismissReason?: string;
     }
   | { type: "toggle-agent-status"; id: string }
   | { type: "trigger-agent-scan"; id: string }
   | { type: "publish-artifact"; id: string }
+  | { type: "create-artifact"; artifact: LivingArtifact }
   | { type: "trigger-source-sync"; id: string }
   | { type: "reset" };
 

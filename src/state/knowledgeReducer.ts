@@ -313,6 +313,21 @@ export function knowledgeReducer(
           },
           ...state.activities,
         ];
+      } else if (action.status === "dismissed" && updatedAction) {
+        activities = [
+          {
+            id: `act-dsm-${Date.now()}`,
+            title: `Action Dismissed: ${updatedAction.title}`,
+            detail: action.dismissReason || "Action dismissed by operational lead.",
+            occurredAt: now,
+            entityKind: "action",
+            entityId: action.id,
+            actorName: action.dismissedBy || "Alex Chen",
+            impactLevel: "low",
+            activityType: "dismissal",
+          },
+          ...state.activities,
+        ];
       }
 
       return {
@@ -325,6 +340,10 @@ export function knowledgeReducer(
                 executedAt: action.status === "executed" ? now : a.executedAt,
                 executedBy: action.executedBy || a.executedBy,
                 executionResult: action.result || a.executionResult,
+                dismissedAt: action.status === "dismissed" ? now : a.dismissedAt,
+                dismissedBy: action.dismissedBy || a.dismissedBy,
+                dismissReason: action.dismissReason || a.dismissReason,
+                updatedAt: now,
               }
             : a,
         ),
@@ -362,6 +381,27 @@ export function knowledgeReducer(
             : art,
         ),
       };
+    case "create-artifact": {
+      const now = new Date().toISOString();
+      const newArtifact = action.artifact;
+      const newActivity = {
+        id: `act-art-${Date.now()}`,
+        title: `Living Artifact Created: ${newArtifact.title}`,
+        detail: `Synthesized grounded ${newArtifact.category.toUpperCase()} grounded across ${newArtifact.evidenceIds.length} evidence sources.`,
+        occurredAt: now,
+        entityKind: "artifact" as const,
+        entityId: newArtifact.id,
+        actorName: "Sarah Ahmed",
+        impactLevel: "medium" as const,
+        activityType: "artifact-generation",
+      };
+      return {
+        ...state,
+        artifacts: [newArtifact, ...state.artifacts],
+        activities: [newActivity, ...state.activities],
+        freshActivityId: newActivity.id,
+      };
+    }
     case "trigger-source-sync": {
       const now = new Date().toISOString();
       return {

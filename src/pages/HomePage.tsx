@@ -131,6 +131,229 @@ export function HomePage() {
         </div>
       </section>
 
+      {/* Phase 3: Attention & Operational Pulse */}
+      <section className="section">
+        <div className="section-head">
+          <h3>Attention & Operational Pulse</h3>
+          <Link to="/actions">Action Center →</Link>
+        </div>
+
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 16 }}>
+          {/* Pending Actions & Conflicts */}
+          <div
+            className="card"
+            style={{
+              padding: "18px 20px",
+              display: "flex",
+              flexDirection: "column",
+              gap: 12,
+              borderLeft: "3px solid var(--warning)",
+            }}
+          >
+            <span
+              className="tiny"
+              style={{
+                textTransform: "uppercase",
+                letterSpacing: "0.06em",
+                fontWeight: 700,
+                color: "var(--warning)",
+              }}
+            >
+              What Needs Attention
+            </span>
+
+            {(() => {
+              const pendingActions = state.actions.filter(
+                (a) => a.status === "proposed" || a.status === "under-review",
+              );
+              const urgentActions = state.actions.filter(
+                (a) =>
+                  (a.priority === "urgent" || a.priority === "high") &&
+                  a.status !== "executed" &&
+                  a.status !== "dismissed",
+              );
+              return (
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  {urgentActions.length > 0 ? (
+                    <Link
+                      to="/actions"
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 6,
+                        padding: "8px 10px",
+                        backgroundColor: "var(--danger-soft)",
+                        borderRadius: "6px",
+                        fontSize: "13px",
+                        fontWeight: 600,
+                        color: "var(--danger)",
+                        textDecoration: "none",
+                      }}
+                    >
+                      <span className="dot" style={{ backgroundColor: "var(--danger)" }} />
+                      {urgentActions.length} high-priority action{urgentActions.length !== 1 ? "s" : ""} require immediate attention
+                    </Link>
+                  ) : null}
+
+                  {pendingActions.length > 0 ? (
+                    <Link
+                      to="/actions"
+                      style={{
+                        padding: "8px 10px",
+                        backgroundColor: "var(--bg)",
+                        borderRadius: "6px",
+                        fontSize: "13px",
+                        color: "var(--text)",
+                        textDecoration: "none",
+                      }}
+                    >
+                      <strong>{pendingActions.length} pending</strong> action{pendingActions.length !== 1 ? "s" : ""} awaiting review or approval
+                    </Link>
+                  ) : (
+                    <span style={{ fontSize: "13px", color: "var(--success)" }}>✓ No pending actions</span>
+                  )}
+
+                  {openConflicts.length > 0 ? (
+                    <Link
+                      to="/conflicts"
+                      style={{
+                        padding: "8px 10px",
+                        backgroundColor: "var(--bg)",
+                        borderRadius: "6px",
+                        fontSize: "13px",
+                        color: "var(--danger)",
+                        fontWeight: 500,
+                        textDecoration: "none",
+                      }}
+                    >
+                      {openConflicts.length} unresolved organizational conflict{openConflicts.length !== 1 ? "s" : ""}
+                    </Link>
+                  ) : null}
+                </div>
+              );
+            })()}
+          </div>
+
+          {/* Sentinel Watch */}
+          <div
+            className="card"
+            style={{
+              padding: "18px 20px",
+              display: "flex",
+              flexDirection: "column",
+              gap: 12,
+              borderLeft: "3px solid var(--accent)",
+            }}
+          >
+            <span
+              className="tiny"
+              style={{
+                textTransform: "uppercase",
+                letterSpacing: "0.06em",
+                fontWeight: 700,
+                color: "var(--accent)",
+              }}
+            >
+              Sentinel Watch
+            </span>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {state.agents.map((ag) => (
+                <Link
+                  key={ag.id}
+                  to={`/agents/${ag.id}`}
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    padding: "8px 10px",
+                    backgroundColor: "var(--bg)",
+                    borderRadius: "6px",
+                    fontSize: "13px",
+                    textDecoration: "none",
+                    color: "var(--text)",
+                  }}
+                >
+                  <div>
+                    <strong>{ag.name}</strong>
+                    <div className="tiny" style={{ color: "var(--text-secondary)" }}>
+                      {ag.role}
+                    </div>
+                  </div>
+                  <span
+                    style={{
+                      fontSize: "11px",
+                      fontWeight: 600,
+                      padding: "2px 7px",
+                      borderRadius: "4px",
+                      backgroundColor: ag.findingsCount > 0 ? "var(--warning-soft)" : "var(--success-soft)",
+                      color: ag.findingsCount > 0 ? "var(--warning)" : "var(--success)",
+                    }}
+                  >
+                    {ag.findingsCount > 0 ? `${ag.findingsCount} finding${ag.findingsCount !== 1 ? "s" : ""}` : "Clear"}
+                  </span>
+                </Link>
+              ))}
+            </div>
+          </div>
+
+          {/* Quick Action Triggers */}
+          <div
+            className="card"
+            style={{
+              padding: "18px 20px",
+              display: "flex",
+              flexDirection: "column",
+              gap: 12,
+              borderLeft: "3px solid var(--success)",
+            }}
+          >
+            <span
+              className="tiny"
+              style={{
+                textTransform: "uppercase",
+                letterSpacing: "0.06em",
+                fontWeight: 700,
+                color: "var(--success)",
+              }}
+            >
+              What Can I Do Next?
+            </span>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              <button
+                className="btn"
+                style={{ justifyContent: "flex-start", fontSize: "13px" }}
+                onClick={() => navigate(`/chat?prompt=${encodeURIComponent("What should I review today?")}`)}
+              >
+                Ask Memory: "What should I review today?"
+              </button>
+              <button
+                className="btn"
+                style={{ justifyContent: "flex-start", fontSize: "13px" }}
+                onClick={() => navigate("/actions")}
+              >
+                Review Pending Actions →
+              </button>
+              <button
+                className="btn"
+                style={{ justifyContent: "flex-start", fontSize: "13px" }}
+                onClick={() => navigate("/artifacts")}
+              >
+                Browse Living Artifacts →
+              </button>
+              <button
+                className="btn"
+                style={{ justifyContent: "flex-start", fontSize: "13px" }}
+                onClick={() => navigate("/workspace")}
+              >
+                Open Workspace View →
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <section className="section">
         <div className="section-head">
           <h3>What changed recently</h3>

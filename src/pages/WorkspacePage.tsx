@@ -52,6 +52,34 @@ export function WorkspacePage() {
     return true;
   });
 
+  const scopedArtifacts = state.artifacts.filter((art) => {
+    if (currentWorkspace.id === "ws-all") return true;
+    if (currentWorkspace.id === "ws-eng") {
+      return art.category === "sop" || art.authorPersonId === "person-maya" || art.authorPersonId === "person-alex";
+    }
+    if (currentWorkspace.id === "ws-prod") {
+      return art.category === "brief" || art.authorPersonId === "person-sarah";
+    }
+    if (currentWorkspace.id === "ws-ops") {
+      return art.category === "report" || art.authorPersonId === "person-rachel";
+    }
+    return true;
+  });
+
+  const scopedAgents = state.agents.filter((ag) => {
+    if (currentWorkspace.id === "ws-all") return true;
+    if (currentWorkspace.id === "ws-eng") {
+      return ag.id === "agent-provenance" || ag.id === "agent-drift";
+    }
+    if (currentWorkspace.id === "ws-prod") {
+      return ag.id === "agent-drift";
+    }
+    if (currentWorkspace.id === "ws-ops") {
+      return ag.id === "agent-sla";
+    }
+    return true;
+  });
+
   return (
     <main className="page">
       <div className="crumbs">
@@ -81,7 +109,7 @@ export function WorkspacePage() {
           className="btn"
           onClick={() =>
             navigate(
-              `/chat?prompt=${encodeURIComponent(
+              `/chat?contextKind=workspace&contextId=${currentWorkspace.id}&prompt=${encodeURIComponent(
                 `What are the active decisions and responsibilities scoped to ${currentWorkspace.name}?`,
               )}`,
             )
@@ -252,6 +280,89 @@ export function WorkspacePage() {
                       Made by: {decision.madeBy}
                     </div>
                   </div>
+                </Link>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Scoped Living Artifacts & Operational Sentinels */}
+      <section className="section">
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 20 }}>
+          {/* Living Artifacts */}
+          <div className="card" style={{ padding: "18px" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+              <h4 style={{ margin: 0, fontSize: "13px", textTransform: "uppercase", letterSpacing: "0.04em", color: "var(--text-secondary)" }}>
+                Scoped Living Artifacts ({scopedArtifacts.length})
+              </h4>
+              <Link to="/artifacts" style={{ fontSize: "12px", fontWeight: 600, color: "var(--accent)" }}>
+                View All →
+              </Link>
+            </div>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {scopedArtifacts.slice(0, 3).map((art) => (
+                <Link
+                  key={art.id}
+                  to={`/artifacts/${art.id}`}
+                  style={{
+                    padding: "10px",
+                    backgroundColor: "var(--bg)",
+                    borderRadius: "6px",
+                    fontSize: "13px",
+                    textDecoration: "none",
+                    color: "var(--text)",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 4,
+                  }}
+                >
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <strong>{art.title}</strong>
+                    <span className="tiny" style={{ color: "var(--accent)", fontWeight: 600 }}>{art.currentVersion}</span>
+                  </div>
+                  <span className="tiny" style={{ color: "var(--text-secondary)" }}>{art.summary}</span>
+                </Link>
+              ))}
+            </div>
+          </div>
+
+          {/* Scoped Sentinels */}
+          <div className="card" style={{ padding: "18px" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+              <h4 style={{ margin: 0, fontSize: "13px", textTransform: "uppercase", letterSpacing: "0.04em", color: "var(--text-secondary)" }}>
+                Active Governance Sentinels ({scopedAgents.length})
+              </h4>
+              <Link to="/agents" style={{ fontSize: "12px", fontWeight: 600, color: "var(--accent)" }}>
+                View All →
+              </Link>
+            </div>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {scopedAgents.map((ag) => (
+                <Link
+                  key={ag.id}
+                  to={`/agents/${ag.id}`}
+                  style={{
+                    padding: "10px",
+                    backgroundColor: "var(--bg)",
+                    borderRadius: "6px",
+                    fontSize: "13px",
+                    textDecoration: "none",
+                    color: "var(--text)",
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                  }}
+                >
+                  <div>
+                    <strong>{ag.name}</strong>
+                    <div className="tiny" style={{ color: "var(--text-secondary)" }}>{ag.role}</div>
+                  </div>
+                  <span className="tiny" style={{ color: "var(--warning)", fontWeight: 600 }}>
+                    {ag.findingsCount} active finding{ag.findingsCount !== 1 ? "s" : ""}
+                  </span>
                 </Link>
               ))}
             </div>

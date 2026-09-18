@@ -2,20 +2,23 @@ import { useState } from "react";
 import { Link, Navigate, useParams, useNavigate } from "react-router-dom";
 import { useKnowledge } from "../state/knowledgeContext";
 import { formatDateTime, entityPath } from "../lib/format";
-import type { AgentStatus } from "../data/types";
+import { EvidenceDrawer } from "../components/knowledge/EvidenceDrawer";
+
+import type { AgentStatus, Evidence } from "../data/types";
 
 export function AgentDetailPage() {
   const { id } = useParams();
   const { state, dispatch } = useKnowledge();
   const navigate = useNavigate();
   const [scanMessage, setScanMessage] = useState<string | null>(null);
+  const [selectedEvidence, setSelectedEvidence] = useState<Evidence | null>(null);
 
   const agent = state.agents.find((ag) => ag.id === id);
   if (!agent) return <Navigate to="/agents" replace />;
 
   function handleTriggerScan() {
     dispatch({ type: "trigger-agent-scan", id: agent!.id });
-    setScanMessage("Manual scan completed. Evaluated target repositories against active rules.");
+    setScanMessage("Manual scan completed. Evaluated target repositories against active inspection rules.");
     setTimeout(() => setScanMessage(null), 4000);
   }
 
@@ -40,6 +43,28 @@ export function AgentDetailPage() {
       </span>
     );
   };
+
+  // Mock inspection run history for this agent
+  const inspectionHistory = [
+    {
+      timestamp: agent.lastRun,
+      status: "completed",
+      findingsCount: agent.findingsCount,
+      summary: `${agent.targetScopes.join(", ")} inspected. ${agent.findingsCount} policy divergence(s) flagged.`,
+    },
+    {
+      timestamp: "2026-09-17T12:00:00",
+      status: "completed",
+      findingsCount: 0,
+      summary: "Scheduled automated scan. Zero new deviations observed.",
+    },
+    {
+      timestamp: "2026-09-16T18:00:00",
+      status: "completed",
+      findingsCount: 1,
+      summary: "Evaluated customer contracts and pitch collateral against ratified policies.",
+    },
+  ];
 
   return (
     <main className="page">
@@ -128,7 +153,7 @@ export function AgentDetailPage() {
         </dl>
       </section>
 
-      {/* Inspection Rules */}
+      {/* Operational Inspection Rules */}
       <section className="section">
         <div className="section-head">
           <h3>Operational Inspection Rules</h3>
@@ -146,29 +171,36 @@ export function AgentDetailPage() {
         </div>
       </section>
 
-      {/* Active Findings & Generated Actions */}
+      {/* Active Findings & Generated Actions: AGENT -> FINDING -> EVIDENCE -> ACTION */}
       <section className="section">
         <div className="section-head">
           <h3>Detected Anomalies & Recommendations</h3>
-          <span className="tiny">Anchored in evidence</span>
+          <span className="tiny">AGENT → FINDING → EVIDENCE → RECOMMENDATION → ACTION</span>
         </div>
 
         {agent.activeFindings.length ? (
-          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
             {agent.activeFindings.map((finding) => {
               const generatedAction = finding.actionId
                 ? state.actions.find((a) => a.id === finding.actionId)
                 : undefined;
+
+              // Find evidence connected to this finding's entity or generated action
+              const relatedEvidence = state.evidence.filter(
+                (ev) =>
+                  ev.relatedId === finding.relatedEntityId ||
+                  (generatedAction && (generatedAction.evidenceIds || []).includes(ev.id)),
+              );
 
               return (
                 <div
                   key={finding.id}
                   className="card"
                   style={{
-                    padding: "16px 20px",
+                    padding: "20px",
                     display: "flex",
                     flexDirection: "column",
-                    gap: 10,
+                    gap: 12,
                     borderLeft:
                       finding.severity === "high"
                         ? "4px solid var(--danger)"
@@ -205,32 +237,96 @@ export function AgentDetailPage() {
                       to={entityPath(finding.relatedEntityKind, finding.relatedEntityId)}
                       style={{ fontSize: "12.5px", fontWeight: 600, color: "var(--accent)" }}
                     >
-                      View Target Entity →
+                      Inspect Target Entity ({finding.relatedEntityKind}) →
                     </Link>
                   </div>
 
-                  <p style={{ margin: 0, fontSize: "14px", lineHeight: 1.45 }}>
-                    {finding.summary}
-                  </p>
+                  <div>
+                    <strong style={{ fontSize: "14px", display: "block", marginBottom: 2 }}>
+                      Sentinel Finding:
+                    </strong>
+                    <p style={{ margin: 0, fontSize: "14px", lineHeight: 1.5, color: "var(--text)" }}>
+                      {finding.summary}
+                    </p>
+                  </div>
 
+                  {/* Evidence Citations */}
+                  {relatedEvidence.length > 0 ? (
+                    <div style={{ padding: "10px 14px", backgroundColor: "var(--bg)", borderRadius: "6px" }}>
+                      <span className="tiny" style={{ textTransform: "uppercase", fontWeight: 700, color: "var(--text-secondary)", display: "block", marginBottom: 6 }}>
+                        Corroborating Primary Evidence:
+                      </span>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                        {relatedEvidence.slice(0, 2).map((ev) => (
+                          <div
+                            key={ev.id}
+                            onClick={() => setSelectedEvidence(ev)}
+                            style={{
+                              fontSize: "12.5px",
+                              cursor: "pointer",
+                              display: "flex",
+                              justifyContent: "space-between",
+                              alignItems: "center",
+                              gap: 8,
+                            }}
+                          >
+                            <span style={{ fontStyle: "italic", color: "var(--text)" }}>
+                              “{ev.quote}”
+                            </span>
+                            <span style={{ fontSize: "11.5px", color: "var(--accent)", fontWeight: 600, whiteSpace: "nowrap" }}>
+                              Inspect Source →
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
+
+                  {/* Generated Action in Action Center */}
                   {generatedAction ? (
                     <div
                       style={{
-                        padding: "8px 12px",
-                        backgroundColor: "var(--bg)",
+                        padding: "12px 14px",
+                        backgroundColor: "var(--surface-2)",
                         borderRadius: "6px",
-                        fontSize: "12.5px",
+                        borderLeft: "3px solid var(--accent)",
                         display: "flex",
                         justifyContent: "space-between",
                         alignItems: "center",
+                        flexWrap: "wrap",
+                        gap: 10,
                       }}
                     >
-                      <span>
-                        <strong>Action Generated:</strong> {generatedAction.title}
-                      </span>
-                      <Link to="/actions" style={{ fontWeight: 600, color: "var(--accent)" }}>
-                        Review in Action Center →
-                      </Link>
+                      <div>
+                        <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 2 }}>
+                          <span className="tiny" style={{ textTransform: "uppercase", fontWeight: 700, color: "var(--accent)" }}>
+                            Recommended Action:
+                          </span>
+                          <span
+                            style={{
+                              fontSize: "11px",
+                              fontWeight: 600,
+                              padding: "1px 6px",
+                              borderRadius: "4px",
+                              backgroundColor: "var(--accent-soft)",
+                              color: "var(--accent)",
+                            }}
+                          >
+                            {generatedAction.status}
+                          </span>
+                        </div>
+                        <strong style={{ fontSize: "13.5px" }}>{generatedAction.title}</strong>
+                      </div>
+
+                      <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                        <Link
+                          to="/actions"
+                          className="btn primary"
+                          style={{ fontSize: "12.5px", padding: "6px 12px" }}
+                        >
+                          Review in Action Center →
+                        </Link>
+                      </div>
                     </div>
                   ) : null}
                 </div>
@@ -243,6 +339,60 @@ export function AgentDetailPage() {
           </div>
         )}
       </section>
+
+      {/* Inspection Run History */}
+      <section className="section">
+        <div className="section-head">
+          <h3>Inspection Run Audit Log</h3>
+          <span className="tiny">Chronological verification history</span>
+        </div>
+
+        <div className="card" style={{ padding: "16px 20px" }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            {inspectionHistory.map((run, idx) => (
+              <div
+                key={idx}
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "flex-start",
+                  paddingBottom: idx !== inspectionHistory.length - 1 ? 10 : 0,
+                  borderBottom: idx !== inspectionHistory.length - 1 ? "1px solid var(--border)" : "none",
+                  fontSize: "13px",
+                }}
+              >
+                <div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 2 }}>
+                    <span style={{ fontWeight: 600, color: "var(--success)" }}>✓ Run Completed</span>
+                    <span className="tiny" style={{ color: "var(--text-muted)" }}>
+                      {formatDateTime(run.timestamp)}
+                    </span>
+                  </div>
+                  <div style={{ color: "var(--text-secondary)" }}>{run.summary}</div>
+                </div>
+                <span
+                  style={{
+                    fontSize: "11.5px",
+                    fontWeight: 600,
+                    padding: "2px 8px",
+                    borderRadius: "4px",
+                    backgroundColor: run.findingsCount > 0 ? "var(--warning-soft)" : "var(--surface-2)",
+                    color: run.findingsCount > 0 ? "var(--warning)" : "var(--text-secondary)",
+                  }}
+                >
+                  {run.findingsCount} finding{run.findingsCount !== 1 ? "s" : ""}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <EvidenceDrawer
+        evidence={selectedEvidence}
+        source={selectedEvidence ? state.sources.find((s) => s.id === selectedEvidence.sourceId) : undefined}
+        onClose={() => setSelectedEvidence(null)}
+      />
     </main>
   );
 }

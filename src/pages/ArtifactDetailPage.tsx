@@ -17,9 +17,9 @@ export function ArtifactDetailPage() {
   if (!artifact) return <Navigate to="/artifacts" replace />;
 
   const author = state.people.find((p) => p.id === artifact.authorPersonId);
-  const evidenceList = state.evidence.filter((e) => artifact.evidenceIds.includes(e.id));
-  const decisions = state.decisions.filter((d) => artifact.relatedDecisionIds.includes(d.id));
-  const projects = state.projects.filter((p) => artifact.relatedProjectIds.includes(p.id));
+  const evidenceList = state.evidence.filter((e) => (artifact.evidenceIds || []).includes(e.id));
+  const decisions = state.decisions.filter((d) => (artifact.relatedDecisionIds || []).includes(d.id));
+  const projects = state.projects.filter((p) => (artifact.relatedProjectIds || []).includes(p.id));
 
   function handlePublish() {
     dispatch({ type: "publish-artifact", id: artifact!.id });

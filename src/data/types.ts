@@ -12,7 +12,7 @@ export type EntityKind =
   | "agent"
   | "artifact";
 
-export type SourceKind = "slack" | "teams" | "meeting";
+export type SourceKind = "slack" | "teams" | "meeting" | "drive" | "github";
 
 export type ProcessStatus = "current" | "deprecated";
 export type DecisionStatus = "active" | "superseded";
@@ -193,7 +193,7 @@ export interface Watcher {
   isWatched: boolean;
 }
 
-export type ActionStatus = "proposed" | "under-review" | "approved" | "executed";
+export type ActionStatus = "proposed" | "under-review" | "approved" | "executed" | "dismissed";
 export type ActionPriority = "urgent" | "high" | "medium" | "low";
 
 export interface ActionItem {
@@ -207,6 +207,9 @@ export interface ActionItem {
   assignedTo: string;
   targetKind: EntityKind;
   targetId: string;
+  source?: string;
+  reason?: string;
+  evidenceIds?: string[];
   relatedDecisionId?: string;
   relatedConflictId?: string;
   impactSummary: string;
@@ -214,6 +217,10 @@ export interface ActionItem {
   executedAt?: string;
   executedBy?: string;
   executionResult?: string;
+  dismissedAt?: string;
+  dismissedBy?: string;
+  dismissReason?: string;
+  updatedAt?: string;
 }
 
 export type AgentStatus = "active" | "paused" | "evaluating";

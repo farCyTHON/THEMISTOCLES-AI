@@ -21,9 +21,25 @@ export const sources: Source[] = [
     id: "src-meeting-sync",
     kind: "meeting",
     name: "Engineering Sync",
-    location: "Weekly meeting",
+    location: "Weekly meeting recordings",
     connected: true,
     lastSynced: "2026-09-13T10:15:00",
+  },
+  {
+    id: "src-gdrive-policies",
+    kind: "drive",
+    name: "Google Drive",
+    location: "Acme Corporate Policies & SOPs",
+    connected: true,
+    lastSynced: "2026-09-15T08:00:00",
+  },
+  {
+    id: "src-github-repos",
+    kind: "github",
+    name: "GitHub",
+    location: "acme-corp/architecture & runbooks",
+    connected: true,
+    lastSynced: "2026-09-17T18:30:00",
   },
 ];
 

@@ -6,6 +6,19 @@ import { EvidenceDrawer } from "../components/knowledge/EvidenceDrawer";
 import { entityPath, formatDateTime } from "../lib/format";
 import type { Evidence, EntityKind } from "../data/types";
 
+interface NextActionItem {
+  label: string;
+  url: string;
+  primary?: boolean;
+}
+
+interface GroundedItem {
+  title: string;
+  detail: string;
+  link: string;
+  badge?: string;
+}
+
 interface ChatMessage {
   id: string;
   sender: "user" | "themistocles";
@@ -19,6 +32,8 @@ interface ChatMessage {
     affectedEntities?: { kind: EntityKind; id: string; label: string }[];
     conflictId?: string;
     isUnsupported?: boolean;
+    groundedList?: GroundedItem[];
+    nextActions?: NextActionItem[];
   };
 }
 
@@ -62,6 +77,9 @@ export function MemoryChatPage() {
     } else if (contextKind === "artifact") {
       const art = (state.artifacts || []).find((item) => item.id === contextId);
       if (art) contextLabel = `Artifact: ${art.title}`;
+    } else if (contextKind === "workspace") {
+      const ws = (state.workspaces || []).find((item) => item.id === contextId);
+      if (ws) contextLabel = `Workspace: ${ws.name}`;
     }
   }
 
@@ -114,9 +132,19 @@ export function MemoryChatPage() {
           sender: "themistocles",
           timestamp: now,
           answer: {
-            summary: `Action "${act.title}" is currently ${act.status} with ${act.priority} priority, assigned to ${act.assignedTo}.`,
+            summary: `Action "${act.title}" is currently in ${act.status.toUpperCase()} state with ${act.priority.toUpperCase()} priority, assigned to ${act.assignedTo}.`,
             why: act.description,
+            evidenceIds: act.evidenceIds,
             affectedEntities: act.affectedEntities,
+            nextActions: [
+              { label: "Inspect in Action Center →", url: "/actions", primary: true },
+              ...(act.relatedDecisionId
+                ? [{ label: "Review Related Decision →", url: `/knowledge/decisions/${act.relatedDecisionId}` }]
+                : []),
+              ...(act.relatedConflictId
+                ? [{ label: "Review Related Conflict →", url: `/conflicts/${act.relatedConflictId}` }]
+                : []),
+            ],
           },
         };
       }
@@ -130,9 +158,13 @@ export function MemoryChatPage() {
           sender: "themistocles",
           timestamp: now,
           answer: {
-            summary: `Autonomous Sentinel "${ag.name}" is currently ${ag.status}. It monitors at ${ag.interval} intervals with inspection scope over [${ag.targetScopes.join(", ")}].`,
-            why: `${ag.description} Last run: ${ag.lastRun}. Total findings recorded: ${ag.findingsCount}.`,
+            summary: `Autonomous Sentinel "${ag.name}" is currently ${ag.status.toUpperCase()}. It monitors on ${ag.interval} cadence covering: [${ag.targetScopes.join(", ")}].`,
+            why: `${ag.description} Last run: ${formatDateTime(ag.lastRun)}. Recorded ${ag.findingsCount} active finding(s).`,
             affectedEntities: ag.activeFindings.map((f) => ({ kind: "action" as EntityKind, id: f.actionId || f.id, label: f.summary })),
+            nextActions: [
+              { label: "Inspect Sentinel Rules & Logs →", url: `/agents/${ag.id}`, primary: true },
+              { label: "Review Generated Actions →", url: "/actions" },
+            ],
           },
         };
       }
@@ -146,56 +178,271 @@ export function MemoryChatPage() {
           sender: "themistocles",
           timestamp: now,
           answer: {
-            summary: `Living Artifact "${art.title}" (${art.category}, v${art.currentVersion}) is grounded across ${art.evidenceIds.length} verified evidence sources.`,
+            summary: `Living Artifact "${art.title}" (${art.category.toUpperCase()}, ${art.currentVersion}) is grounded across ${art.evidenceIds.length} verified evidence sources.`,
             why: art.summary,
             evidenceIds: art.evidenceIds,
-            affectedEntities: art.relatedDecisionIds.map((decId) => ({ kind: "decision" as EntityKind, id: decId, label: `Decision ${decId}` })),
+            affectedEntities: art.relatedDecisionIds.map((decId) => ({ kind: "decision" as EntityKind, id: decId, label: `Decision #${decId.replace("dec-", "")}` })),
+            nextActions: [
+              { label: "Read Living Artifact →", url: `/artifacts/${art.id}`, primary: true },
+              { label: "View All Artifacts →", url: "/artifacts" },
+            ],
           },
         };
       }
     }
 
-    if (cKind === "decision" && cId === "dec-142") {
+    if (cKind === "workspace" && cId) {
+      const ws = (state.workspaces || []).find((w) => w.id === cId);
+      if (ws) {
+        return {
+          id: `msg-t-${Date.now()}`,
+          sender: "themistocles",
+          timestamp: now,
+          answer: {
+            summary: `Workspace "${ws.name}" encompasses ${ws.memberCount} team members across ${ws.connectedSystems.length} systems. It scopes ${ws.activeDecisionsCount} governance decisions and ${ws.pendingActionsCount} operational actions.`,
+            why: ws.description,
+            affectedEntities: [
+              { kind: "person" as EntityKind, id: ws.leadPersonId, label: "Workspace Lead" },
+            ],
+            nextActions: [
+              { label: `Open ${ws.name} Workspace View →`, url: "/workspace", primary: true },
+              { label: "Review Scoped Actions →", url: "/actions" },
+            ],
+          },
+        };
+      }
+    }
+
+    // 2. "Create an executive brief for Project Atlas" (Deterministic Phase 3 Generation)
+    if (
+      (q.includes("create") || q.includes("generate") || q.includes("draft") || q.includes("write")) &&
+      (q.includes("brief") || q.includes("artifact") || q.includes("report") || q.includes("memo") || q.includes("summary")) &&
+      (q.includes("atlas") || q.includes("pricing") || q.includes("project"))
+    ) {
+      const existing = state.artifacts.find((a) => a.id === "art-pricing-brief" || a.id.startsWith("art-atlas-"));
+      const artId = existing ? existing.id : "art-pricing-brief";
+
       return {
         id: `msg-t-${Date.now()}`,
         sender: "themistocles",
         timestamp: now,
         answer: {
-          summary:
-            "Decision #142 shifted Enterprise customers from monthly billing to mandatory annual upfront contracts effective Q4.",
-          why: "Enterprise customers requested predictable budgeting. Finance analysis led by James Okafor demonstrated a 40% improvement in revenue predictability.",
-          decision: { id: "dec-142", number: 142, title: "Enterprise pricing moved to annual contracts" },
+          summary: "Executive Brief prepared for Project Atlas (Enterprise Pricing & Annual Contracts).",
+          why: "Synthesized directly from Decision #142, Customer Advisory Council feedback, Finance cohort revenue predictability models, and Project Atlas transition roadmap.",
           evidenceIds: ["ev-pricing-finance", "ev-pricing-sales", "ev-pricing-customer", "ev-pricing-leadership"],
           affectedEntities: [
             { kind: "project", id: "proj-atlas", label: "Project Atlas" },
-            { kind: "process", id: "proc-onboard", label: "Customer onboarding" },
-            { kind: "person", id: "person-sarah", label: "Sarah Ahmed" },
+            { kind: "decision", id: "dec-142", label: "Decision #142 (Annual Contracts)" },
+            { kind: "person", id: "person-sarah", label: "Sarah Ahmed (PM)" },
+          ],
+          nextActions: [
+            { label: "Open Living Artifact →", url: `/artifacts/${artId}`, primary: true },
+            { label: "Review Decision #142 →", url: "/knowledge/decisions/dec-142" },
+            { label: "View Action Center →", url: "/actions" },
           ],
         },
       };
     }
 
-    if (cKind === "decision" && cId === "dec-184") {
+    // 3. "What should I review today?" / "What should I review?"
+    if (
+      q.includes("what should i review") ||
+      q.includes("review today") ||
+      q.includes("what to review") ||
+      q.includes("needs my attention") ||
+      q.includes("priority today")
+    ) {
       return {
         id: `msg-t-${Date.now()}`,
         sender: "themistocles",
         timestamp: now,
         answer: {
-          summary:
-            "Decision #184 instituted a mandatory Security Review gate for all production releases in Deployment Process v3.2.",
-          why: "Near-miss incidents during production deploys indicated the need for a security checkpoint before release.",
-          decision: { id: "dec-184", number: 184, title: "Mandatory security review before production deployment" },
-          evidenceIds: ["ev-slack-184", "ev-meeting-184"],
+          summary: "3 priority items require your operational attention today across governance, policy consistency, and SLA alignment.",
+          why: "Synthesized from active conflicts, pending Action Center proposals, and autonomous sentinel scans.",
+          evidenceIds: ["ev-pricing-customer", "ev-pricing-sales", "ev-incident"],
+          groundedList: [
+            {
+              title: "1. Update Enterprise Sales Playbook (Action act-001)",
+              detail: "Resolves Conflict C-001 between 14-day sales pitch and 30-day CS onboarding SLA.",
+              link: "/actions",
+              badge: "Urgent Action",
+            },
+            {
+              title: "2. Audit EMEA Proposal Decks (Action act-002)",
+              detail: "Enforces Decision #142 annual billing mandate across regional sales repositories.",
+              link: "/actions",
+              badge: "High Priority",
+            },
+            {
+              title: "3. Investigate Policy Drift Sentinel Anomaly",
+              detail: "Policy Drift Sentinel flagged legacy monthly clauses circulating in pitch collateral.",
+              link: "/agents/agent-drift",
+              badge: "Sentinel Finding",
+            },
+          ],
           affectedEntities: [
-            { kind: "process", id: "proc-deploy", label: "Deployment Process" },
-            { kind: "process", id: "proc-sec-review", label: "Security Review" },
-            { kind: "system", id: "sys-payment", label: "Payment Service" },
+            { kind: "action", id: "act-001", label: "Action act-001" },
+            { kind: "action", id: "act-002", label: "Action act-002" },
+            { kind: "conflict", id: "conf-001", label: "Conflict C-001" },
+            { kind: "decision", id: "dec-142", label: "Decision #142" },
+          ],
+          nextActions: [
+            { label: "Open Action Center →", url: "/actions", primary: true },
+            { label: "Review Conflict C-001 →", url: "/conflicts/conf-001" },
+            { label: "Inspect Policy Drift Sentinel →", url: "/agents/agent-drift" },
           ],
         },
       };
     }
 
-    // 2. Pricing / Annual Contracts
+    // 4. "What actions need approval?"
+    if (
+      (q.includes("action") && (q.includes("approval") || q.includes("need") || q.includes("pending") || q.includes("review"))) ||
+      q === "what actions need approval?" ||
+      q.includes("actions pending")
+    ) {
+      const pending = state.actions.filter((a) => a.status === "proposed" || a.status === "under-review");
+      return {
+        id: `msg-t-${Date.now()}`,
+        sender: "themistocles",
+        timestamp: now,
+        answer: {
+          summary: `${pending.length} actions in the Action Center currently require review or approval before execution.`,
+          why: "Operational proposals generated by sentinels and leads remain gated until signed off by stakeholders.",
+          evidenceIds: ["ev-pricing-customer", "ev-pricing-sales"],
+          groundedList: pending.map((a) => ({
+            title: a.title,
+            detail: `${a.priority.toUpperCase()} priority · Proposed by ${a.proposedBy} · ${a.impactSummary}`,
+            link: "/actions",
+            badge: a.status.toUpperCase(),
+          })),
+          affectedEntities: pending.map((a) => ({ kind: "action" as EntityKind, id: a.id, label: a.title })),
+          nextActions: [
+            { label: "Review All in Action Center →", url: "/actions", primary: true },
+            { label: "View Active Sentinels →", url: "/agents" },
+          ],
+        },
+      };
+    }
+
+    // 5. "What did the Policy Drift Detector find?"
+    if (
+      q.includes("drift") ||
+      (q.includes("policy") && (q.includes("detector") || q.includes("sentinel") || q.includes("find") || q.includes("found")))
+    ) {
+      // Policy Drift Sentinel response
+      return {
+        id: `msg-t-${Date.now()}`,
+        sender: "themistocles",
+        timestamp: now,
+        answer: {
+          summary: "Policy Drift Sentinel detected that EMEA sales proposal templates are circulating legacy monthly billing terms contradictory to Decision #142, and Engineering Slack discussions moved database migrations to Tuesday morning ahead of SOP documentation.",
+          why: "Cross-referencing active document repositories against ratified decision records revealed non-compliant pitch templates.",
+          evidenceIds: ["ev-pricing-sales", "ev-pricing-leadership", "ev-migrate-prior"],
+          affectedEntities: [
+            { kind: "agent", id: "agent-drift", label: "Policy Drift Sentinel" },
+            { kind: "decision", id: "dec-142", label: "Decision #142" },
+            { kind: "action", id: "act-002", label: "Action act-002" },
+            { kind: "action", id: "act-003", label: "Action act-003" },
+          ],
+          nextActions: [
+            { label: "Inspect Policy Drift Sentinel →", url: "/agents/agent-drift", primary: true },
+            { label: "Review Remediation Action act-002 →", url: "/actions" },
+            { label: "Review Decision #142 →", url: "/knowledge/decisions/dec-142" },
+          ],
+        },
+      };
+    }
+
+    // 6. "What are the agents monitoring?"
+    if (
+      q.includes("agent") ||
+      q.includes("sentinel") ||
+      q.includes("autonomous") ||
+      q.includes("what are the agents monitoring") ||
+      q.includes("monitoring")
+    ) {
+      const activeAgents = (state.agents || []).filter((a) => a.status === "active").length;
+      return {
+        id: `msg-t-${Date.now()}`,
+        sender: "themistocles",
+        timestamp: now,
+        answer: {
+          summary: `Themistocles operates 3 autonomous governance sentinels (${activeAgents} currently active): 1) Policy Drift Sentinel, 2) SLA Consistency Monitor, and 3) Provenance & Evidence Sentinel.`,
+          why: "Sentinels continuously inspect knowledge nodes and emit suggested remediation actions into the Action Center whenever drift or divergence is detected.",
+          evidenceIds: ["ev-pricing-customer", "ev-migrate-prior"],
+          groundedList: state.agents.map((ag) => ({
+            title: `${ag.name} (${ag.status.toUpperCase()})`,
+            detail: `${ag.role} · Scope: ${ag.targetScopes.join(", ")} · ${ag.findingsCount} active finding(s)`,
+            link: `/agents/${ag.id}`,
+            badge: ag.status,
+          })),
+          affectedEntities: state.agents.map((ag) => ({ kind: "agent" as EntityKind, id: ag.id, label: ag.name })),
+          nextActions: [
+            { label: "View Autonomous Agents Overview →", url: "/agents", primary: true },
+            { label: "Inspect Generated Actions →", url: "/actions" },
+          ],
+        },
+      };
+    }
+
+    // 7. "What sources changed recently?"
+    if (
+      q.includes("source") ||
+      q.includes("connector") ||
+      q.includes("slack") ||
+      q.includes("teams") ||
+      q.includes("sources changed")
+    ) {
+      return {
+        id: `msg-t-${Date.now()}`,
+        sender: "themistocles",
+        timestamp: now,
+        answer: {
+          summary: "Recent signals were ingested from Slack (#engineering), Microsoft Teams (Security Review), and Engineering Sync recordings. Ingestion captured the consensus moving Database Migrations to Tuesday mornings and Security Review sign-off for release v3.2.",
+          why: "All connected source channels report active telemetry with zero sync failures logged in the last 48 hours.",
+          evidenceIds: ["ev-slack-184", "ev-meeting-184", "ev-api-own"],
+          groundedList: state.sources.map((s) => ({
+            title: `${s.name} (${s.location})`,
+            detail: `Kind: ${s.kind.toUpperCase()} · Status: ${s.connected ? "Connected" : "Disconnected"} · Last Synced: ${formatDateTime(s.lastSynced)}`,
+            link: "/sources",
+            badge: s.connected ? "Active" : "Offline",
+          })),
+          affectedEntities: state.sources.map((s) => ({ kind: "source" as EntityKind, id: s.id, label: s.name })),
+          nextActions: [
+            { label: "Manage Connected Sources →", url: "/sources", primary: true },
+            { label: "Inspect Activity Stream →", url: "/activity" },
+          ],
+        },
+      };
+    }
+
+    // 8. Conflicts
+    if (q.includes("conflict") || q.includes("disagree") || q.includes("contradiction") || q.includes("discrepancy")) {
+      const openCount = state.conflicts.filter((c) => c.status !== "resolved").length;
+      return {
+        id: `msg-t-${Date.now()}`,
+        sender: "themistocles",
+        timestamp: now,
+        answer: {
+          summary: `Themistocles currently monitors ${openCount} active organizational conflicts: 1) Customer onboarding timeframe (30 days CS Policy vs 14 days Sales Playbook), 2) Enterprise billing terms in EMEA proposals, and 3) Database schema migration window.`,
+          why: "Knowledge contradictions occur when operational documents and live chat agreements evolve asynchronously without formal reconciliation.",
+          evidenceIds: ["ev-pricing-customer", "ev-pricing-sales", "ev-migrate-prior"],
+          affectedEntities: [
+            { kind: "conflict", id: "conf-001", label: "Onboarding Period Conflict" },
+            { kind: "conflict", id: "conf-002", label: "EMEA Billing Conflict" },
+            { kind: "conflict", id: "conf-003", label: "Migration Window Conflict" },
+          ],
+          nextActions: [
+            { label: "Review All Conflicts →", url: "/conflicts", primary: true },
+            { label: "Inspect Conflict C-001 →", url: "/conflicts/conf-001" },
+            { label: "Review Action act-001 →", url: "/actions" },
+          ],
+        },
+      };
+    }
+
+    // 9. Pricing / Annual Contracts
     if (q.includes("pricing") || q.includes("annual contract") || q.includes("billing") || q.includes("dec-142") || q.includes("142")) {
       return {
         id: `msg-t-${Date.now()}`,
@@ -214,11 +461,16 @@ export function MemoryChatPage() {
             { kind: "person", id: "person-james", label: "James Okafor" },
           ],
           conflictId: "conf-002",
+          nextActions: [
+            { label: "Inspect Decision #142 →", url: "/knowledge/decisions/dec-142", primary: true },
+            { label: "Read Pricing Living Artifact →", url: "/artifacts/art-pricing-brief" },
+            { label: "Review Project Atlas →", url: "/projects/proj-atlas" },
+          ],
         },
       };
     }
 
-    // 3. What changed / Recent changes
+    // 10. What changed / Recent changes
     if (q.includes("what changed") || q.includes("recent changes") || q.includes("this week")) {
       return {
         id: `msg-t-${Date.now()}`,
@@ -235,218 +487,41 @@ export function MemoryChatPage() {
             { kind: "process", id: "proc-deploy", label: "Deployment Process" },
             { kind: "system", id: "sys-api", label: "API Gateway" },
           ],
-        },
-      };
-    }
-
-    // 4. Project Atlas
-    if (q.includes("atlas") || q.includes("proj-atlas")) {
-      return {
-        id: `msg-t-${Date.now()}`,
-        sender: "themistocles",
-        timestamp: now,
-        answer: {
-          summary:
-            "Project Atlas is the enterprise pricing restructuring initiative owned by Sarah Ahmed (Product). It encompasses the transition to annual contracts and updated sales workflows.",
-          why: "Governed by Decision #142 (Annual contracts) and Decision #138 (Sales workflow updates).",
-          decision: { id: "dec-142", number: 142, title: "Enterprise pricing moved to annual contracts" },
-          evidenceIds: ["ev-pricing-leadership", "ev-pricing-sales"],
-          affectedEntities: [
-            { kind: "person", id: "person-sarah", label: "Sarah Ahmed (Lead)" },
-            { kind: "process", id: "proc-onboard", label: "Customer onboarding" },
-            { kind: "team", id: "team-ops", label: "Sales & Operations" },
-          ],
-          conflictId: "conf-002",
-        },
-      };
-    }
-
-    // 5. Conflicts / Disagreements / Contradictions
-    if (q.includes("conflict") || q.includes("disagree") || q.includes("contradiction") || q.includes("discrepancy")) {
-      const openCount = state.conflicts.filter((c) => c.status !== "resolved").length;
-      return {
-        id: `msg-t-${Date.now()}`,
-        sender: "themistocles",
-        timestamp: now,
-        answer: {
-          summary: `Themistocles currently monitors ${openCount} active organizational conflicts: 1) Customer onboarding timeframe (30 days CS Policy vs 14 days Sales Playbook), 2) Enterprise billing terms in EMEA proposals, and 3) Database schema migration window (Friday evening vs Tuesday morning).`,
-          why: "Knowledge contradictions occur when operational documents and live chat agreements evolve asynchronously without formal reconciliation.",
-          evidenceIds: ["ev-pricing-customer", "ev-pricing-sales", "ev-migrate-prior"],
-          affectedEntities: [
-            { kind: "conflict", id: "conf-001", label: "Onboarding Period Conflict" },
-            { kind: "conflict", id: "conf-002", label: "EMEA Billing Conflict" },
-            { kind: "conflict", id: "conf-003", label: "Migration Window Conflict" },
+          nextActions: [
+            { label: "View Organizational Pulse →", url: "/pulse", primary: true },
+            { label: "Inspect Activity Stream →", url: "/activity" },
+            { label: "Review Action Center →", url: "/actions" },
           ],
         },
       };
     }
 
-    // 6. Onboarding
-    if (q.includes("onboard")) {
+    // 11. Living Artifacts
+    if (q.includes("artifact") || q.includes("living document") || q.includes("standard") || q.includes("doc")) {
       return {
         id: `msg-t-${Date.now()}`,
         sender: "themistocles",
         timestamp: now,
         answer: {
-          summary:
-            "Organizational memory tracks two distinct onboarding contexts: 1) Employee Onboarding is owned by Daniel Kim (Operations), providing first-week Themistocles access (Decision #155). 2) Customer Onboarding is currently subject to an open conflict between Customer Success (30 days) and Sales (14 days SLA).",
-          why: "Rapid enterprise growth created an SLA divergence between sales promises and CSM onboarding capacity.",
-          decision: { id: "dec-155", number: 155, title: "Onboarding includes organizational memory access" },
-          evidenceIds: ["ev-onboard", "ev-pricing-customer"],
-          affectedEntities: [
-            { kind: "person", id: "person-daniel", label: "Daniel Kim" },
-            { kind: "person", id: "person-rachel", label: "Rachel Kim" },
-            { kind: "conflict", id: "conf-001", label: "Customer Onboarding Conflict" },
-          ],
-          conflictId: "conf-001",
-        },
-      };
-    }
-
-    // 7. Security / Deployment review
-    if (q.includes("security") || q.includes("deploy") || q.includes("dec-184") || q.includes("184")) {
-      return {
-        id: `msg-t-${Date.now()}`,
-        sender: "themistocles",
-        timestamp: now,
-        answer: {
-          summary:
-            "All production releases require a two-person review and a mandatory Security Review gate owned by Maya Patel (Security Engineer).",
-          why: "Instituted under Decision #184 after production incident reviews identified the need for pre-release validation.",
-          decision: { id: "dec-184", number: 184, title: "Mandatory security review before production deployment" },
-          evidenceIds: ["ev-slack-184", "ev-meeting-184"],
-          affectedEntities: [
-            { kind: "process", id: "proc-deploy", label: "Deployment Process v3.2" },
-            { kind: "person", id: "person-maya", label: "Maya Patel" },
-            { kind: "person", id: "person-alex", label: "Alex Chen" },
-          ],
-        },
-      };
-    }
-
-    // 8. Sarah Ahmed
-    if (q.includes("sarah") || q.includes("ahmed")) {
-      return {
-        id: `msg-t-${Date.now()}`,
-        sender: "themistocles",
-        timestamp: now,
-        answer: {
-          summary:
-            "Sarah Ahmed is Product Manager for Project Atlas. She authored Decision #142 (transitioning enterprise pricing to annual contracts) and oversees pricing and billing operational alignment.",
-          why: "Sarah led the quarterly customer advisory cohort reviews that validated annual procurement demand.",
-          decision: { id: "dec-142", number: 142, title: "Enterprise pricing moved to annual contracts" },
-          evidenceIds: ["ev-pricing-leadership"],
-          affectedEntities: [
-            { kind: "person", id: "person-sarah", label: "Sarah Ahmed" },
-            { kind: "project", id: "proj-atlas", label: "Project Atlas" },
-          ],
-        },
-      };
-    }
-
-    // 9. API Gateway / sys-api
-    if (q.includes("api gateway") || q.includes("dec-179") || q.includes("179") || q.includes("gateway")) {
-      return {
-        id: `msg-t-${Date.now()}`,
-        sender: "themistocles",
-        timestamp: now,
-        answer: {
-          summary:
-            "API Gateway ownership was transferred from Engineering to Operations (Daniel Kim) under Decision #179 on September 8, 2026.",
-          why: "Engineering was overburdened with both feature delivery and infrastructure upkeep. Moving the gateway freed up Engineering capacity.",
-          decision: { id: "dec-179", number: 179, title: "Transfer API Gateway ownership to Operations" },
-          evidenceIds: ["ev-api-own"],
-          affectedEntities: [
-            { kind: "system", id: "sys-api", label: "API Gateway" },
-            { kind: "team", id: "team-ops", label: "Operations" },
-            { kind: "person", id: "person-daniel", label: "Daniel Kim" },
-          ],
-        },
-      };
-    }
-
-    // 10. Database Migration
-    if (q.includes("migration") || q.includes("database") || q.includes("schema")) {
-      return {
-        id: `msg-t-${Date.now()}`,
-        sender: "themistocles",
-        timestamp: now,
-        answer: {
-          summary:
-            "Database Migration process (v2.3) governs schema alterations. A schedule discrepancy currently exists between Friday evening maintenance and Tuesday morning low-traffic preferences.",
-          why: "Alex Chen and Sam Lee discussed shifting migrations to Tuesday morning to ensure full team availability on deck.",
-          evidenceIds: ["ev-migrate-prior", "ev-slack-184"],
-          affectedEntities: [
-            { kind: "process", id: "proc-migrate", label: "Database Migration" },
-            { kind: "system", id: "sys-db", label: "Database" },
-            { kind: "conflict", id: "conf-003", label: "Migration Window Conflict" },
-          ],
-          conflictId: "conf-003",
-        },
-      };
-    }
-
-    // 11. Actions & Governance
-    if (q.includes("action") || q.includes("pending") || q.includes("approval") || q.includes("task") || q.includes("reconcil")) {
-      const pending = (state.actions || []).filter((a) => a.status !== "executed");
-      return {
-        id: `msg-t-${Date.now()}`,
-        sender: "themistocles",
-        timestamp: now,
-        answer: {
-          summary: `There are currently ${pending.length} pending operational actions awaiting human review in the Action Center. Key items include reconciling the onboarding SLA conflict, updating deployment runbooks for security review gates, and migrating EMEA sales quotes to annual billing.`,
-          why: "Operational actions are continuously synthesized from policy drift, sentinel scans, and verified organizational decisions to prevent execution lag.",
-          evidenceIds: ["ev-pricing-sales", "ev-slack-184"],
-          affectedEntities: [
-            { kind: "action", id: "act-001", label: "Reconcile Onboarding SLA Conflict" },
-            { kind: "action", id: "act-002", label: "Update Deployment Runbook for Security Review Gate" },
-            { kind: "action", id: "act-003", label: "Audit EMEA Sales Quotes for Annual Terms" },
-          ],
-        },
-      };
-    }
-
-    // 12. Autonomous Agents / Sentinels
-    if (q.includes("agent") || q.includes("sentinel") || q.includes("autonomous") || q.includes("monitor") || q.includes("scan")) {
-      const activeAgents = (state.agents || []).filter((a) => a.status === "active").length;
-      return {
-        id: `msg-t-${Date.now()}`,
-        sender: "themistocles",
-        timestamp: now,
-        answer: {
-          summary: `Themistocles operates 3 autonomous governance sentinels (${activeAgents} currently active): 1) Policy Drift Sentinel (watches documentation vs live Slack threads), 2) SLA Divergence Sentinel (monitors commitments across customer contracts), and 3) Provenance Verifier (verifies claims against primary sources).`,
-          why: "Sentinels continuously inspect knowledge nodes and emit suggested remediation actions into the Action Center whenever drift or divergence is detected.",
-          evidenceIds: ["ev-pricing-customer", "ev-migrate-prior"],
-          affectedEntities: [
-            { kind: "agent", id: "agent-drift", label: "Policy Drift Sentinel" },
-            { kind: "agent", id: "agent-sla", label: "SLA Divergence Sentinel" },
-            { kind: "agent", id: "agent-provenance", label: "Provenance Verifier" },
-          ],
-        },
-      };
-    }
-
-    // 13. Living Artifacts
-    if (q.includes("artifact") || q.includes("brief") || q.includes("living document") || q.includes("standard") || q.includes("draft") || q.includes("doc")) {
-      const arts = state.artifacts || [];
-      return {
-        id: `msg-t-${Date.now()}`,
-        sender: "themistocles",
-        timestamp: now,
-        answer: {
-          summary: `Themistocles maintains ${arts.length} living, grounded artifacts: 1) Executive Pricing Brief (Q4 2026 Strategy), 2) Production Deployment Standard v3.2, and 3) Customer Onboarding Alignment Report. These documents continuously update their claims and citations as decisions and evidence change.`,
-          why: "Living artifacts prevent organizational documentation from going stale by maintaining persistent footnote citations linked to primary source evidence.",
+          summary: `Themistocles maintains ${state.artifacts.length} living, grounded artifacts: 1) Executive Pricing Brief (Project Atlas), 2) Production Deployment Standard v3.2, and 3) Customer Onboarding Alignment Report.`,
+          why: "Living artifacts prevent documentation from going stale by maintaining persistent footnote citations linked to primary source evidence.",
           evidenceIds: ["ev-pricing-finance", "ev-slack-184", "ev-pricing-customer"],
-          affectedEntities: [
-            { kind: "artifact", id: "art-pricing-brief", label: "Executive Pricing Brief" },
-            { kind: "artifact", id: "art-deploy-standard", label: "Production Deployment Standard" },
-            { kind: "artifact", id: "art-onboarding-report", label: "Customer Onboarding Alignment Report" },
+          groundedList: state.artifacts.map((art) => ({
+            title: `${art.title} (${art.currentVersion})`,
+            detail: `${art.category.toUpperCase()} · ${art.summary}`,
+            link: `/artifacts/${art.id}`,
+            badge: art.status,
+          })),
+          affectedEntities: state.artifacts.map((art) => ({ kind: "artifact" as EntityKind, id: art.id, label: art.title })),
+          nextActions: [
+            { label: "View All Living Artifacts →", url: "/artifacts", primary: true },
+            { label: "Read Pricing Brief →", url: "/artifacts/art-pricing-brief" },
           ],
         },
       };
     }
 
-    // Fallback: Honest, safety-first response (Required by prompt)
+    // Fallback: Honest, safety-first response (No fabrication)
     return {
       id: `msg-t-${Date.now()}`,
       sender: "themistocles",
@@ -456,19 +531,23 @@ export function MemoryChatPage() {
           "I don't have enough recorded evidence in organizational memory to answer that.",
         why: "The current verified organizational dataset covers Enterprise Pricing (Decision #142), Production Security Reviews (Decision #184), API Gateway Ownership (Decision #179), Database Migration (v2.3), Operational Actions, Autonomous Sentinels, Living Artifacts, and active Organizational Conflicts.",
         isUnsupported: true,
+        nextActions: [
+          { label: "Review Pending Actions →", url: "/actions", primary: true },
+          { label: "Explore Knowledge Hub →", url: "/knowledge" },
+        ],
       },
     };
   }
 
   const suggestedQuestions = [
+    "What should I review today?",
+    "What actions need approval?",
+    "What did the Policy Drift Detector find?",
+    "What are the agents monitoring?",
+    "What sources changed recently?",
     "Why did our pricing change?",
-    "What operational actions are pending approval?",
-    "What are our autonomous sentinels monitoring?",
-    "Show grounded living artifacts",
-    "What decisions affect Project Atlas?",
+    "Create an executive brief for Project Atlas.",
     "Show unresolved organizational conflicts",
-    "Who owns customer onboarding?",
-    "What evidence supports our latest product decision?",
   ];
 
   return (
@@ -505,11 +584,11 @@ export function MemoryChatPage() {
                 color: "var(--accent)",
               }}
             >
-              Intelligence Layer
+              Intelligence & Operations Layer
             </span>
           </div>
           <p style={{ color: "var(--text-secondary)", margin: "4px 0 0", fontSize: "14px" }}>
-            Direct natural language querying over organizational decisions, evidence, changes, and policies.
+            Direct natural language querying over organizational decisions, evidence, actions, sentinels, and policies.
           </p>
         </div>
 
@@ -560,7 +639,7 @@ export function MemoryChatPage() {
         }}
       >
         {messages.length === 0 ? (
-          /* Empty Chat State (Required by prompt) */
+          /* Empty Chat State */
           <div
             className="card"
             style={{
@@ -597,15 +676,15 @@ export function MemoryChatPage() {
                   margin: 0,
                   fontSize: "14px",
                   color: "var(--text-secondary)",
-                  maxWidth: 520,
+                  maxWidth: 540,
                   lineHeight: 1.5,
                 }}
               >
-                Explore decisions, people, projects, changes, evidence, and organizational context with verifiable provenance.
+                Explore decisions, pending actions, autonomous sentinels, living artifacts, and verifiable evidence.
               </p>
             </div>
 
-            <div style={{ marginTop: 8, width: "100%", maxWidth: 640 }}>
+            <div style={{ marginTop: 8, width: "100%", maxWidth: 680 }}>
               <span
                 className="tiny"
                 style={{
@@ -675,13 +754,13 @@ export function MemoryChatPage() {
                   {msg.text}
                 </div>
               ) : (
-                /* Themistocles Contextual Answer Card (Required by prompt) */
+                /* Themistocles Contextual Answer Card: ANSWER + EVIDENCE + RELATED ENTITIES + NEXT ACTION */
                 <div
                   className="card"
                   style={{
                     width: "100%",
                     maxWidth: 780,
-                    padding: "20px 24px",
+                    padding: "22px 26px",
                     borderRadius: "4px 14px 14px 14px",
                     backgroundColor: "var(--surface)",
                     boxShadow: "var(--shadow)",
@@ -715,6 +794,47 @@ export function MemoryChatPage() {
                       {msg.answer?.summary}
                     </p>
                   </div>
+
+                  {/* Grounded Items List (e.g. for Review Today, Actions Need Approval) */}
+                  {msg.answer?.groundedList?.length ? (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                      <span className="tiny" style={{ color: "var(--text-secondary)", textTransform: "uppercase", fontWeight: 700 }}>
+                        Identified Review Items ({msg.answer.groundedList.length})
+                      </span>
+                      {msg.answer.groundedList.map((item, iIdx) => (
+                        <Link
+                          key={iIdx}
+                          to={item.link}
+                          style={{
+                            padding: "10px 12px",
+                            backgroundColor: "var(--bg)",
+                            borderRadius: "6px",
+                            border: "1px solid var(--border)",
+                            display: "flex",
+                            justifyContent: "space-between",
+                            alignItems: "center",
+                            textDecoration: "none",
+                            color: "var(--text)",
+                          }}
+                        >
+                          <div>
+                            <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 2 }}>
+                              <strong style={{ fontSize: "13.5px" }}>{item.title}</strong>
+                              {item.badge ? (
+                                <span className="tiny" style={{ backgroundColor: "var(--accent-soft)", color: "var(--accent)", padding: "1px 6px", borderRadius: "4px", fontWeight: 600 }}>
+                                  {item.badge}
+                                </span>
+                              ) : null}
+                            </div>
+                            <div style={{ fontSize: "12.5px", color: "var(--text-secondary)" }}>{item.detail}</div>
+                          </div>
+                          <span style={{ fontSize: "12px", color: "var(--accent)", fontWeight: 600, whiteSpace: "nowrap", marginLeft: 10 }}>
+                            Review →
+                          </span>
+                        </Link>
+                      ))}
+                    </div>
+                  ) : null}
 
                   {/* Why Section */}
                   {msg.answer?.why ? (
@@ -773,7 +893,7 @@ export function MemoryChatPage() {
                     </div>
                   ) : null}
 
-                  {/* Supporting Evidence Quotes (Clickable) */}
+                  {/* Supporting Evidence Quotes (Clickable to Drawer) */}
                   {msg.answer?.evidenceIds?.length ? (
                     <div>
                       <span className="tiny" style={{ color: "var(--text-secondary)", textTransform: "uppercase" }}>
@@ -802,7 +922,7 @@ export function MemoryChatPage() {
                                   {ev.title || src?.name || "Source Log"}
                                   {ev.speaker ? ` · ${ev.speaker}` : ""}
                                 </strong>
-                                <span style={{ color: "var(--accent)", fontWeight: 600 }}>Inspect →</span>
+                                <span style={{ color: "var(--accent)", fontWeight: 600 }}>Inspect Evidence →</span>
                               </div>
                               <div style={{ fontStyle: "italic", fontSize: "12.5px", marginTop: 2 }}>“{ev.quote}”</div>
                             </div>
@@ -844,24 +964,24 @@ export function MemoryChatPage() {
                     </div>
                   ) : null}
 
-                  {/* Conflict notification if relevant */}
-                  {msg.answer?.conflictId ? (
-                    <div
-                      style={{
-                        padding: "8px 12px",
-                        backgroundColor: "var(--warning-soft)",
-                        borderRadius: "6px",
-                        borderLeft: "3px solid var(--warning)",
-                        fontSize: "12.5px",
-                        display: "flex",
-                        justifyContent: "space-between",
-                        alignItems: "center",
-                      }}
-                    >
-                      <span>Notice: Active knowledge conflict associated with this topic.</span>
-                      <Link to={`/conflicts/${msg.answer.conflictId}`} style={{ fontWeight: 600 }}>
-                        Review conflict →
-                      </Link>
+                  {/* NEXT ACTIONS (No dead ends, direct action triggers) */}
+                  {msg.answer?.nextActions?.length ? (
+                    <div style={{ borderTop: "1px solid var(--border)", paddingTop: 12 }}>
+                      <span className="tiny" style={{ color: "var(--text-secondary)", textTransform: "uppercase", fontWeight: 700, display: "block", marginBottom: 8 }}>
+                        Next Recommended Actions:
+                      </span>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                        {msg.answer.nextActions.map((na, nIdx) => (
+                          <Link
+                            key={nIdx}
+                            to={na.url}
+                            className={`btn ${na.primary ? "primary" : ""}`}
+                            style={{ fontSize: "12.5px", padding: "6px 12px" }}
+                          >
+                            {na.label}
+                          </Link>
+                        ))}
+                      </div>
                     </div>
                   ) : null}
                 </div>
@@ -894,7 +1014,7 @@ export function MemoryChatPage() {
           type="text"
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          placeholder={`Query ${contextLabel}... (e.g. "Why did pricing change?", "Show conflicts")`}
+          placeholder={`Query ${contextLabel}... (e.g. "What should I review today?", "What actions need approval?")`}
           style={{
             flex: 1,
             padding: "10px 14px",

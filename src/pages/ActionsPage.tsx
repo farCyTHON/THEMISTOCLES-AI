@@ -2,39 +2,53 @@ import { useState, useMemo } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useKnowledge } from "../state/knowledgeContext";
 import { EntityBadge } from "../components/ui/EntityBadge";
+import { EvidenceDrawer } from "../components/knowledge/EvidenceDrawer";
 import { entityPath, formatDateTime, formatDate } from "../lib/format";
-import type { ActionStatus, ActionPriority, ActionItem } from "../data/types";
+import type { ActionStatus, ActionPriority, ActionItem, Evidence } from "../data/types";
+
+type ActionFilter = "all" | "needs-review" | "approved" | "executed" | "dismissed";
 
 export function ActionsPage() {
   const { state, dispatch } = useKnowledge();
   const navigate = useNavigate();
 
-  const [filter, setFilter] = useState<"all" | ActionStatus>("all");
+  const [filter, setFilter] = useState<ActionFilter>("all");
   const [selectedAction, setSelectedAction] = useState<ActionItem | null>(null);
-  const [modalMode, setModalMode] = useState<"approve" | "execute" | null>(null);
+  const [modalMode, setModalMode] = useState<"approve" | "execute" | "dismiss" | "detail" | null>(null);
   const [execResultNotes, setExecResultNotes] = useState("");
+  const [dismissReason, setDismissReason] = useState("");
+  const [selectedEvidence, setSelectedEvidence] = useState<Evidence | null>(null);
 
   const filteredActions = useMemo(() => {
     if (filter === "all") return state.actions;
+    if (filter === "needs-review") {
+      return state.actions.filter((a) => a.status === "proposed" || a.status === "under-review");
+    }
     return state.actions.filter((a) => a.status === filter);
   }, [state.actions, filter]);
 
-  const pendingCount = state.actions.filter((a) => a.status === "proposed" || a.status === "under-review").length;
+  const needsReviewCount = state.actions.filter((a) => a.status === "proposed" || a.status === "under-review").length;
   const approvedCount = state.actions.filter((a) => a.status === "approved").length;
   const executedCount = state.actions.filter((a) => a.status === "executed").length;
-  const urgentCount = state.actions.filter((a) => a.priority === "urgent" || a.priority === "high").length;
+  const dismissedCount = state.actions.filter((a) => a.status === "dismissed").length;
+  const urgentCount = state.actions.filter(
+    (a) => (a.priority === "urgent" || a.priority === "high") && a.status !== "executed" && a.status !== "dismissed",
+  ).length;
 
   function handleActionTransition(action: ActionItem, newStatus: ActionStatus, notes?: string) {
     dispatch({
       type: "update-action-status",
       id: action.id,
       status: newStatus,
-      executedBy: "Alex Chen",
-      result: notes || (newStatus === "executed" ? "Action executed and verified across organizational systems." : undefined),
+      executedBy: newStatus === "executed" ? "Alex Chen" : undefined,
+      result: newStatus === "executed" ? (notes || "Action executed and verified across organizational systems.") : undefined,
+      dismissedBy: newStatus === "dismissed" ? "Alex Chen" : undefined,
+      dismissReason: newStatus === "dismissed" ? (notes || "Action dismissed by operational consensus.") : undefined,
     });
     setModalMode(null);
     setSelectedAction(null);
     setExecResultNotes("");
+    setDismissReason("");
   }
 
   const priorityBadge = (priority: ActionPriority) => {
@@ -68,6 +82,7 @@ export function ActionsPage() {
       "under-review": { label: "Under Review", bg: "var(--warning-soft)", color: "var(--warning)" },
       approved: { label: "Approved", bg: "var(--accent-soft)", color: "var(--accent)" },
       executed: { label: "Executed", bg: "var(--success-soft)", color: "var(--success)" },
+      dismissed: { label: "Dismissed", bg: "var(--surface-2)", color: "var(--text-muted)" },
     }[status];
     return (
       <span
@@ -128,18 +143,18 @@ export function ActionsPage() {
       <section className="section">
         <div className="stats">
           <div className="stat">
-            <div className="stat-label">Pending Review</div>
-            <div className="stat-value" style={{ color: pendingCount > 0 ? "var(--warning)" : "inherit" }}>
-              {pendingCount}
+            <div className="stat-label">Needs Review</div>
+            <div className="stat-value" style={{ color: needsReviewCount > 0 ? "var(--warning)" : "inherit" }}>
+              {needsReviewCount}
             </div>
-            <div className="stat-detail">Requires decision sign-off</div>
+            <div className="stat-detail">Proposed or under review</div>
           </div>
           <div className="stat">
-            <div className="stat-label">Ready to Execute</div>
+            <div className="stat-label">Approved</div>
             <div className="stat-value" style={{ color: approvedCount > 0 ? "var(--accent)" : "inherit" }}>
               {approvedCount}
             </div>
-            <div className="stat-detail">Approved by stakeholders</div>
+            <div className="stat-detail">Ready to execute</div>
           </div>
           <div className="stat">
             <div className="stat-label">Executed</div>
@@ -149,11 +164,11 @@ export function ActionsPage() {
             <div className="stat-detail">Applied to organization</div>
           </div>
           <div className="stat">
-            <div className="stat-label">High Priority</div>
+            <div className="stat-label">High Priority Attention</div>
             <div className="stat-value" style={{ color: urgentCount > 0 ? "var(--danger)" : "inherit" }}>
               {urgentCount}
             </div>
-            <div className="stat-detail">Time-sensitive alignment</div>
+            <div className="stat-detail">Urgent operational alignment</div>
           </div>
         </div>
       </section>
@@ -167,16 +182,10 @@ export function ActionsPage() {
           All Actions ({state.actions.length})
         </button>
         <button
-          className={`filter-chip ${filter === "proposed" ? "active" : ""}`}
-          onClick={() => setFilter("proposed")}
+          className={`filter-chip ${filter === "needs-review" ? "active" : ""}`}
+          onClick={() => setFilter("needs-review")}
         >
-          Proposed ({state.actions.filter((a) => a.status === "proposed").length})
-        </button>
-        <button
-          className={`filter-chip ${filter === "under-review" ? "active" : ""}`}
-          onClick={() => setFilter("under-review")}
-        >
-          Under Review ({state.actions.filter((a) => a.status === "under-review").length})
+          Needs Review ({needsReviewCount})
         </button>
         <button
           className={`filter-chip ${filter === "approved" ? "active" : ""}`}
@@ -189,6 +198,12 @@ export function ActionsPage() {
           onClick={() => setFilter("executed")}
         >
           Executed ({executedCount})
+        </button>
+        <button
+          className={`filter-chip ${filter === "dismissed" ? "active" : ""}`}
+          onClick={() => setFilter("dismissed")}
+        >
+          Dismissed ({dismissedCount})
         </button>
       </div>
 
@@ -208,6 +223,10 @@ export function ActionsPage() {
                 ? state.decisions.find((d) => d.id === action.relatedDecisionId)
                 : undefined;
 
+              const attachedEvidence = (action.evidenceIds || [])
+                .map((evId) => state.evidence.find((e) => e.id === evId))
+                .filter(Boolean) as Evidence[];
+
               return (
                 <article
                   key={action.id}
@@ -218,11 +237,14 @@ export function ActionsPage() {
                     flexDirection: "column",
                     gap: 14,
                     borderLeft:
-                      action.priority === "urgent"
+                      action.status === "dismissed"
+                        ? "4px solid var(--border)"
+                        : action.priority === "urgent"
                         ? "4px solid var(--danger)"
                         : action.priority === "high"
                         ? "4px solid var(--warning)"
-                        : "4px solid var(--border)",
+                        : "4px solid var(--accent)",
+                    opacity: action.status === "dismissed" ? 0.82 : 1,
                   }}
                 >
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 8 }}>
@@ -233,12 +255,27 @@ export function ActionsPage() {
                         <span className="tiny" style={{ color: "var(--text-muted)" }}>
                           Proposed {formatDate(action.proposedAt)}
                         </span>
+                        {action.source ? (
+                          <span className="tiny" style={{ color: "var(--accent)", backgroundColor: "var(--accent-soft)", padding: "1px 6px", borderRadius: "4px" }}>
+                            Source: {action.source}
+                          </span>
+                        ) : null}
                       </div>
                       <h3 style={{ margin: "2px 0 0", fontSize: "16px" }}>{action.title}</h3>
                     </div>
 
                     {/* Action Execution / Transition Buttons */}
                     <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                      <button
+                        className="btn"
+                        onClick={() => {
+                          setSelectedAction(action);
+                          setModalMode("detail");
+                        }}
+                      >
+                        Inspect Action Details →
+                      </button>
+
                       {action.status === "proposed" ? (
                         <>
                           <button
@@ -256,32 +293,63 @@ export function ActionsPage() {
                           >
                             Approve Action →
                           </button>
+                          <button
+                            className="btn"
+                            onClick={() => {
+                              setSelectedAction(action);
+                              setModalMode("dismiss");
+                            }}
+                          >
+                            Dismiss
+                          </button>
                         </>
                       ) : null}
 
                       {action.status === "under-review" ? (
-                        <button
-                          className="btn primary"
-                          onClick={() => {
-                            setSelectedAction(action);
-                            setModalMode("approve");
-                          }}
-                        >
-                          Approve Action →
-                        </button>
+                        <>
+                          <button
+                            className="btn primary"
+                            onClick={() => {
+                              setSelectedAction(action);
+                              setModalMode("approve");
+                            }}
+                          >
+                            Approve Action →
+                          </button>
+                          <button
+                            className="btn"
+                            onClick={() => {
+                              setSelectedAction(action);
+                              setModalMode("dismiss");
+                            }}
+                          >
+                            Dismiss
+                          </button>
+                        </>
                       ) : null}
 
                       {action.status === "approved" ? (
-                        <button
-                          className="btn primary"
-                          style={{ backgroundColor: "var(--success)", borderColor: "var(--success)" }}
-                          onClick={() => {
-                            setSelectedAction(action);
-                            setModalMode("execute");
-                          }}
-                        >
-                          ✓ Execute Action →
-                        </button>
+                        <>
+                          <button
+                            className="btn primary"
+                            style={{ backgroundColor: "var(--success)", borderColor: "var(--success)" }}
+                            onClick={() => {
+                              setSelectedAction(action);
+                              setModalMode("execute");
+                            }}
+                          >
+                            ✓ Execute Action →
+                          </button>
+                          <button
+                            className="btn"
+                            onClick={() => {
+                              setSelectedAction(action);
+                              setModalMode("dismiss");
+                            }}
+                          >
+                            Dismiss
+                          </button>
+                        </>
                       ) : null}
 
                       <button
@@ -304,16 +372,33 @@ export function ActionsPage() {
                     {action.description}
                   </p>
 
-                  <div
-                    style={{
-                      padding: "10px 14px",
-                      backgroundColor: "var(--bg)",
-                      borderRadius: "6px",
-                      fontSize: "13px",
-                      borderLeft: "3px solid var(--accent)",
-                    }}
-                  >
-                    <strong>Expected Impact:</strong> {action.impactSummary}
+                  {/* Impact and Reason */}
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 10 }}>
+                    <div
+                      style={{
+                        padding: "10px 14px",
+                        backgroundColor: "var(--bg)",
+                        borderRadius: "6px",
+                        fontSize: "13px",
+                        borderLeft: "3px solid var(--accent)",
+                      }}
+                    >
+                      <strong>Expected Impact:</strong> {action.impactSummary}
+                    </div>
+
+                    {action.reason ? (
+                      <div
+                        style={{
+                          padding: "10px 14px",
+                          backgroundColor: "var(--bg)",
+                          borderRadius: "6px",
+                          fontSize: "13px",
+                          borderLeft: "3px solid var(--warning)",
+                        }}
+                      >
+                        <strong>Trigger Reason:</strong> {action.reason}
+                      </div>
+                    ) : null}
                   </div>
 
                   {/* Execution Verification Banner if Executed */}
@@ -337,6 +422,47 @@ export function ActionsPage() {
                     </div>
                   ) : null}
 
+                  {/* Dismissal Banner if Dismissed */}
+                  {action.status === "dismissed" && action.dismissedAt ? (
+                    <div
+                      style={{
+                        padding: "10px 14px",
+                        backgroundColor: "var(--surface-2)",
+                        borderRadius: "6px",
+                        borderLeft: "3px solid var(--border)",
+                        fontSize: "13px",
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 4,
+                      }}
+                    >
+                      <strong>
+                        Dismissed on {formatDateTime(action.dismissedAt)} by {action.dismissedBy}
+                      </strong>
+                      <span style={{ color: "var(--text-secondary)" }}>{action.dismissReason}</span>
+                    </div>
+                  ) : null}
+
+                  {/* Attached Evidence Footnotes */}
+                  {attachedEvidence.length > 0 ? (
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", fontSize: "12.5px" }}>
+                      <span className="tiny" style={{ color: "var(--text-secondary)", fontWeight: 600 }}>
+                        Grounding Evidence:
+                      </span>
+                      {attachedEvidence.map((ev) => (
+                        <button
+                          key={ev.id}
+                          className="chip"
+                          onClick={() => setSelectedEvidence(ev)}
+                          style={{ fontSize: "12px", display: "inline-flex", alignItems: "center", gap: 4 }}
+                        >
+                          <span>🔍</span>
+                          <span>{ev.title || "Evidence Quote"}</span>
+                        </button>
+                      ))}
+                    </div>
+                  ) : null}
+
                   {/* Proposer, Assignee, and Related Links */}
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12, paddingTop: 4, borderTop: "1px solid var(--border)" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 16, fontSize: "12.5px" }}>
@@ -344,7 +470,7 @@ export function ActionsPage() {
                         <span className="tiny" style={{ color: "var(--text-secondary)" }}>Proposed by: </span>
                         {proposerAgent ? (
                           <Link to={`/agents/${proposerAgent.id}`} style={{ fontWeight: 600 }}>
-                            {proposerAgent.name} (Agent)
+                            {proposerAgent.name} (Sentinel)
                           </Link>
                         ) : proposerPerson ? (
                           <Link to={`/people/${proposerPerson.id}`} style={{ fontWeight: 600 }}>
@@ -420,8 +546,230 @@ export function ActionsPage() {
         )}
       </section>
 
-      {/* Action Approval / Execution Modal */}
-      {modalMode && selectedAction ? (
+      {/* Action Detail Modal (Structured WHAT, WHY, EVIDENCE, IMPACT, SOURCE, RELATED ENTITIES, NEXT ACTION) */}
+      {modalMode === "detail" && selectedAction ? (
+        <div
+          className="drawer-backdrop"
+          onClick={() => {
+            setModalMode(null);
+            setSelectedAction(null);
+          }}
+          style={{
+            position: "fixed",
+            inset: 0,
+            backgroundColor: "rgba(12, 16, 22, 0.6)",
+            backdropFilter: "blur(2px)",
+            zIndex: 1000,
+            display: "grid",
+            placeItems: "center",
+            padding: "20px",
+          }}
+        >
+          <div
+            className="card"
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: "100%",
+              maxWidth: 680,
+              maxHeight: "90vh",
+              overflowY: "auto",
+              backgroundColor: "var(--surface)",
+              boxShadow: "var(--shadow-lg)",
+              padding: "28px",
+              display: "flex",
+              flexDirection: "column",
+              gap: 20,
+            }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+              <div>
+                <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 6 }}>
+                  {priorityBadge(selectedAction.priority)}
+                  {statusBadge(selectedAction.status)}
+                </div>
+                <h3 style={{ margin: 0, fontSize: "18px" }}>{selectedAction.title}</h3>
+              </div>
+              <button
+                className="btn icon-btn"
+                onClick={() => {
+                  setModalMode(null);
+                  setSelectedAction(null);
+                }}
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* WHAT */}
+            <div>
+              <span className="tiny" style={{ textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 700, color: "var(--accent)" }}>
+                1. What
+              </span>
+              <p style={{ margin: "4px 0 0", fontSize: "14.5px", lineHeight: 1.5 }}>
+                {selectedAction.description}
+              </p>
+            </div>
+
+            {/* WHY & REASON */}
+            <div style={{ padding: "12px 14px", backgroundColor: "var(--bg)", borderRadius: "6px", borderLeft: "3px solid var(--warning)" }}>
+              <span className="tiny" style={{ textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 700, color: "var(--warning)" }}>
+                2. Why & Trigger
+              </span>
+              <p style={{ margin: "4px 0 0", fontSize: "13.5px" }}>
+                {selectedAction.reason || "Action proposed by sentinel monitoring to maintain organizational consistency."}
+              </p>
+            </div>
+
+            {/* EVIDENCE */}
+            <div>
+              <span className="tiny" style={{ textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 700, color: "var(--text-secondary)" }}>
+                3. Grounded Evidence
+              </span>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 6 }}>
+                {(selectedAction.evidenceIds || []).length ? (
+                  selectedAction.evidenceIds!.map((evId) => {
+                    const ev = state.evidence.find((e) => e.id === evId);
+                    if (!ev) return null;
+                    return (
+                      <div
+                        key={ev.id}
+                        onClick={() => setSelectedEvidence(ev)}
+                        style={{
+                          padding: "10px 12px",
+                          backgroundColor: "var(--bg)",
+                          borderRadius: "6px",
+                          cursor: "pointer",
+                          border: "1px solid var(--border)",
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                          fontSize: "13px",
+                        }}
+                      >
+                        <div>
+                          <strong>{ev.title || "Evidence Record"}</strong>
+                          <div style={{ fontStyle: "italic", color: "var(--text-secondary)", marginTop: 2 }}>
+                            “{ev.quote}”
+                          </div>
+                        </div>
+                        <span style={{ color: "var(--accent)", fontWeight: 600, fontSize: "12px" }}>Inspect →</span>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <p className="tiny" style={{ color: "var(--text-secondary)" }}>
+                    No primary quote records directly attached.
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {/* IMPACT & SOURCE */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+              <div style={{ padding: "10px 12px", backgroundColor: "var(--bg)", borderRadius: "6px" }}>
+                <span className="tiny" style={{ textTransform: "uppercase", fontWeight: 700, color: "var(--text-secondary)" }}>
+                  4. Organizational Impact
+                </span>
+                <p style={{ margin: "4px 0 0", fontSize: "13px" }}>{selectedAction.impactSummary}</p>
+              </div>
+              <div style={{ padding: "10px 12px", backgroundColor: "var(--bg)", borderRadius: "6px" }}>
+                <span className="tiny" style={{ textTransform: "uppercase", fontWeight: 700, color: "var(--text-secondary)" }}>
+                  5. Knowledge Source
+                </span>
+                <p style={{ margin: "4px 0 0", fontSize: "13px" }}>{selectedAction.source || "Organizational Sentinel"}</p>
+              </div>
+            </div>
+
+            {/* RELATED ENTITIES */}
+            <div>
+              <span className="tiny" style={{ textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 700, color: "var(--text-secondary)" }}>
+                6. Related Entities
+              </span>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 6 }}>
+                {selectedAction.affectedEntities.map((ae) => (
+                  <Link
+                    key={ae.id}
+                    to={entityPath(ae.kind, ae.id)}
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 4,
+                      fontSize: "12px",
+                      padding: "3px 8px",
+                      borderRadius: "6px",
+                      backgroundColor: "var(--surface-2)",
+                      color: "var(--text)",
+                      textDecoration: "none",
+                    }}
+                  >
+                    <EntityBadge kind={ae.kind} label={ae.kind} />
+                    <span>{ae.label}</span>
+                  </Link>
+                ))}
+              </div>
+            </div>
+
+            {/* NEXT ACTION */}
+            <div style={{ paddingTop: 12, borderTop: "1px solid var(--border)", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
+              <div style={{ display: "flex", gap: 8 }}>
+                {selectedAction.status === "proposed" ? (
+                  <button
+                    className="btn"
+                    onClick={() => handleActionTransition(selectedAction, "under-review")}
+                  >
+                    Mark In Review
+                  </button>
+                ) : null}
+
+                {selectedAction.status === "proposed" || selectedAction.status === "under-review" ? (
+                  <button
+                    className="btn primary"
+                    onClick={() => setModalMode("approve")}
+                  >
+                    Approve Action →
+                  </button>
+                ) : null}
+
+                {selectedAction.status === "approved" ? (
+                  <button
+                    className="btn primary"
+                    style={{ backgroundColor: "var(--success)", borderColor: "var(--success)" }}
+                    onClick={() => setModalMode("execute")}
+                  >
+                    ✓ Execute Action →
+                  </button>
+                ) : null}
+
+                {selectedAction.status !== "executed" && selectedAction.status !== "dismissed" ? (
+                  <button
+                    className="btn"
+                    onClick={() => setModalMode("dismiss")}
+                  >
+                    Dismiss Action
+                  </button>
+                ) : null}
+              </div>
+
+              <button
+                className="btn"
+                onClick={() => {
+                  setModalMode(null);
+                  navigate(
+                    `/chat?contextKind=action&contextId=${selectedAction.id}&prompt=${encodeURIComponent(
+                      `What are the implications and assigned tasks for action: "${selectedAction.title}"?`,
+                    )}`,
+                  );
+                }}
+              >
+                Ask Memory about this →
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {/* Approval / Execution / Dismissal Modal */}
+      {(modalMode === "approve" || modalMode === "execute" || modalMode === "dismiss") && selectedAction ? (
         <div
           className="drawer-backdrop"
           onClick={() => {
@@ -456,7 +804,11 @@ export function ActionsPage() {
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
               <div>
                 <h3 style={{ margin: 0, fontSize: "17px" }}>
-                  {modalMode === "approve" ? "Approve Organizational Action" : "Confirm Action Execution"}
+                  {modalMode === "approve"
+                    ? "Approve Organizational Action"
+                    : modalMode === "execute"
+                    ? "Confirm Action Execution"
+                    : "Dismiss Action"}
                 </h3>
                 <p className="tiny" style={{ margin: "4px 0 0", color: "var(--text-secondary)" }}>
                   {selectedAction.title}
@@ -478,22 +830,34 @@ export function ActionsPage() {
                 <p style={{ margin: 0 }}>
                   Approving this action validates stakeholder consensus and marks it ready for execution across operational workflows.
                 </p>
-              ) : (
+              ) : modalMode === "execute" ? (
                 <p style={{ margin: 0 }}>
                   Executing this action will record an operational mutation in the Themistocles Activity Stream and apply the resolved policy across systems.
+                </p>
+              ) : (
+                <p style={{ margin: 0 }}>
+                  Dismissing this action marks it as evaluated but declined. This decision will be preserved in organizational memory with your stated rationale.
                 </p>
               )}
             </div>
 
             <div>
               <label style={{ display: "block", fontSize: "12.5px", fontWeight: 600, marginBottom: 6 }}>
-                Execution Rationale / Verification Notes
+                {modalMode === "dismiss" ? "Reason for Dismissal" : "Execution Rationale / Verification Notes"}
               </label>
               <textarea
                 rows={3}
-                value={execResultNotes}
-                onChange={(e) => setExecResultNotes(e.target.value)}
-                placeholder="Detail verification results, ticket IDs, or change notes..."
+                value={modalMode === "dismiss" ? dismissReason : execResultNotes}
+                onChange={(e) =>
+                  modalMode === "dismiss"
+                    ? setDismissReason(e.target.value)
+                    : setExecResultNotes(e.target.value)
+                }
+                placeholder={
+                  modalMode === "dismiss"
+                    ? "Explain why this recommendation is declined or deferred..."
+                    : "Detail verification results, ticket IDs, or change notes..."
+                }
                 style={{
                   width: "100%",
                   padding: "8px 10px",
@@ -520,20 +884,48 @@ export function ActionsPage() {
               </button>
               <button
                 className="btn primary"
+                style={{
+                  backgroundColor:
+                    modalMode === "execute"
+                      ? "var(--success)"
+                      : modalMode === "dismiss"
+                      ? "var(--danger)"
+                      : undefined,
+                  borderColor:
+                    modalMode === "execute"
+                      ? "var(--success)"
+                      : modalMode === "dismiss"
+                      ? "var(--danger)"
+                      : undefined,
+                }}
                 onClick={() =>
                   handleActionTransition(
                     selectedAction,
-                    modalMode === "approve" ? "approved" : "executed",
-                    execResultNotes,
+                    modalMode === "approve"
+                      ? "approved"
+                      : modalMode === "execute"
+                      ? "executed"
+                      : "dismissed",
+                    modalMode === "dismiss" ? dismissReason : execResultNotes,
                   )
                 }
               >
-                {modalMode === "approve" ? "Confirm Approval" : "Confirm Execution"}
+                {modalMode === "approve"
+                  ? "Confirm Approval"
+                  : modalMode === "execute"
+                  ? "Confirm Execution"
+                  : "Confirm Dismissal"}
               </button>
             </div>
           </div>
         </div>
       ) : null}
+
+      <EvidenceDrawer
+        evidence={selectedEvidence}
+        source={selectedEvidence ? state.sources.find((s) => s.id === selectedEvidence.sourceId) : undefined}
+        onClose={() => setSelectedEvidence(null)}
+      />
     </main>
   );
 }
